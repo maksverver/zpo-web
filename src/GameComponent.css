@@ -59,9 +59,8 @@
     display: flex;
     flex-direction: row;
     justify-content: center;
-    height: 64px;
-    padding: 2px;
-    scale: 80%;
+    height: 60px;
+    padding: 4px;
 }
 
 .hand .slot {
@@ -70,7 +69,7 @@
     justify-content: center;
     background: #f0f0f0;
     padding: 4px;
-    min-width: 64px;
+    min-width: 48px;
 }
 
 .hand .slot.selectable {
@@ -100,6 +99,14 @@
     font-size: 40px;
     user-select: none;
     background: grey; /* should be overridden below */
+}
+
+/* Pieces in hand are scaled down to 75% of their original size. */
+.hand .slot .piece {
+    width: 42px;
+    height: 42px;
+    line-height: 42px;
+    font-size: 30px;
 }
 
 .hand .slot .piece:not(:first-child) {
