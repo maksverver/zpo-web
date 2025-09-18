@@ -62,6 +62,28 @@ export function getWinner({board}: GameState): 0|1|undefined {
     return undefined;  // either 0 or 2 colors of wazirs left
 }
 
+export type SetupTurn = {
+    type: 'setup',
+    color: 0|1,
+    pieces: PieceType[] & {length: 16}
+};
+
+export type MoveTurn = {
+    type: 'move',
+    src: number,
+    dst: number,
+};
+
+export type DropTurn = {
+    type: 'drop',
+    color: 0|1,
+    piece: PieceType,
+    dst: number,
+};
+
+export type Turn = SetupTurn | MoveTurn | DropTurn;
+
+
 // The stuff below is more for the UI components than general game logic,
 // but I can't be arsed to separate it out at the moment.
 

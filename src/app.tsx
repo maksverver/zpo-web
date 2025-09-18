@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { FIELD_COUNT, Piece, getWinner, initialGameState, isGameOver, type GameState, type MoveGenerator, type PieceType, type Selection, type SimpleMove } from './game';
+import { useCallback, useReducer, useState } from 'react';
+import { FIELD_COUNT, getWinner, initialGameState, isGameOver, type GameState, type MoveGenerator, type PieceType, type Selection, type SimpleMove, type Turn } from './game';
 import GameComponent from './GameComponent';
 import { decodeState, encodeState } from './codec';
 import './app.css';
@@ -77,13 +77,8 @@ function GameStatus({state, onChangeState, finishSetupEnabled, onFinishSetup}: G
     );
 }
 
-const initialSetup = Object.freeze([
-    Piece.WAZIR, Piece.KNIGHT, Piece.FERZ, Piece.FERZ, Piece.DABBABA, Piece.DABBABA, Piece.DABBABA, Piece.DABBABA,
-    Piece.ALFIL, Piece.ALFIL, Piece.ALFIL, Piece.ALFIL, Piece.ALFIL, Piece.ALFIL, Piece.ALFIL, Piece.ALFIL,
-]);
-
 // Allows moving any piece anywhere. Useful for setting up arbitrary positions.
-const freeMoveGenerator: MoveGenerator = {
+const editMoveGenerator: MoveGenerator = {
     generateSelectable(gs: GameState): Selection[] {
         const res: Selection[] = [];
         for (let p = 0; p < 2; ++p) {
@@ -115,7 +110,66 @@ const freeMoveGenerator: MoveGenerator = {
     },
 };
 
-function executeMove(gameState: GameState, move: SimpleMove): GameState {
+const setupFields = Object.freeze([
+    Object.freeze([
+          0,  1,  2,  3,  4,  5,  6,  7,
+          8,  9, 10, 11, 12, 13, 14, 15,
+    ]),
+    Object.freeze([
+         48, 49, 50, 51, 52, 53, 54, 55,
+         56, 57, 58, 59, 60, 61, 62, 63,
+    ]),
+]);
+
+// Allows only valid moves.
+const playMoveGenerator: MoveGenerator = {
+    generateSelectable(gs: GameState): Selection[] {
+        const res: Selection[] = [];
+        const p = gs.turn % 2;
+        if (gs.turn < 2) {
+            // Setup mode.
+            gs.hand[p].forEach((n, i) => {
+                if (n > 0) {
+                    const color = p as 0|1;
+                    const piece = i as PieceType;
+                    res.push({color, piece, src: -1});
+                }
+            });
+            gs.board.forEach((cp, src) => {
+                if (cp != null) {
+                    const {color, piece} = cp;
+                    res.push({color, piece, src});
+                }
+            });
+        } else {
+            // Move mode.
+            // TODO
+        }
+        return res;
+    },
+
+    generateDestinations(gs: GameState, sel: Selection): number[] {
+        const res: number[] = [];
+        const p = gs.turn % 2;
+        if (gs.turn < 2) {
+            // Setup mode.
+            if (sel.src !== -1) {
+                res.push(-1);
+            }
+            for (const i of setupFields[p]) {
+                if (sel.src !== i) {
+                    res.push(i);
+                }
+            }
+        } else {
+            // Move mode.
+            // TODO
+        }
+        return res;
+    },
+};
+
+function executeSimpleMove(gameState: GameState, move: SimpleMove): GameState {
     const board = Array.from(gameState.board);
     const hand = Array.from(gameState.hand, counts => Array.from(counts));
     if (move.src === -1) {
@@ -135,31 +189,96 @@ function executeMove(gameState: GameState, move: SimpleMove): GameState {
     return {board, hand, turn: gameState.turn};
 }
 
-export default function App() {
+export function EditApp() {
     const [gameState, setGameState] = useState<GameState>(initialGameState);
 
     const handleMove = useCallback((move: SimpleMove) => {
-        setGameState(gameState => executeMove(gameState, move));
+        setGameState(gameState => executeSimpleMove(gameState, move));
     }, []);
-
-    const handleFinishSetup = useCallback(() => {
-        // TODO
-    }, []);
-
-    const finishSetupEnabled = undefined;
-    const stateEditable = true;
 
     return (
         <div className="app">
             <div className="game-holder">
                 <GameStatus
                     state={gameState}
-                    onChangeState={stateEditable ? setGameState : undefined}
+                    onChangeState={setGameState}
+                />
+                <GameComponent
+                    moveGenerator={editMoveGenerator}
+                    gameState={gameState}
+                    onMove={handleMove}
+                />
+            </div>
+        </div>
+    );
+}
+
+type PlayAppState = {
+    gameState: GameState,
+    history: Turn[],
+};
+
+const initialAppState: PlayAppState = {
+    gameState: initialGameState,
+    history: [],
+};
+
+type PlayAppAction = {
+    type: 'finish-setup',
+} | {
+    type: 'play-move',
+    move: SimpleMove,
+};
+
+function reduceAppState(appState: PlayAppState, action: PlayAppAction) {
+    function incTurn(gameState: GameState): GameState {
+        return {...gameState, turn: gameState.turn + 1};
+    }
+
+    switch (action.type) {
+        case 'finish-setup':
+            // TODO: construct move for history
+            return {...appState, gameState: incTurn(appState.gameState)};
+
+        case 'play-move':
+            {
+                let newGameState = executeSimpleMove(appState.gameState, action.move);
+                // Automatically end turn after a single move, except during setup.
+                if (newGameState.turn >= 2) {
+                    // TODO: construct move for history
+                    newGameState = incTurn(newGameState);
+                }
+                return {...appState, gameState: newGameState};
+            }
+    }
+}
+
+export function PlayApp() {
+    const [appState, dispatch] = useReducer(reduceAppState, initialAppState);
+    const {gameState} = appState;
+
+    const handleMove = useCallback((move: SimpleMove) => {
+        dispatch({type: 'play-move', move});
+    }, []);
+    const handleFinishSetup = useCallback(() => {
+        dispatch({type: 'finish-setup'});
+    }, []);
+
+    const finishSetupEnabled =
+        gameState.turn < 2
+            ? setupFields[gameState.turn % 2].every(i => gameState.board[i] != null)
+            : undefined;
+
+    return (
+        <div className="app">
+            <div className="game-holder">
+                <GameStatus
+                    state={gameState}
                     finishSetupEnabled={finishSetupEnabled}
                     onFinishSetup={handleFinishSetup}
                 />
                 <GameComponent
-                    moveGenerator={freeMoveGenerator}
+                    moveGenerator={playMoveGenerator}
                     gameState={gameState}
                     onMove={handleMove}
                 />
