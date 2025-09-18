@@ -1,4 +1,6 @@
-export const FIELD_COUNT = 64;
+export const BOARD_WIDTH  =  8;
+export const BOARD_HEIGHT =  8;
+export const FIELD_COUNT  = 64;
 
 export const Piece = Object.freeze({
     WAZIR:   0,  // 0.1
@@ -16,6 +18,41 @@ export const PIECE_COUNT = 5;
 // can have more than this number of pieces on the board thanks to captures and
 // drops.)
 export const initialPieceCounts = Object.freeze([1, 1, 2, 4, 8]);
+
+// moveTables[piece][src] is an array of possible destinations
+export const moveTables = generateMoveTables();
+
+function generateMoveTables(): readonly(readonly (readonly number[])[])[] {
+    const res = [];
+    for (const [d1, d2] of [[0, 1], [1, 2], [1, 1], [0, 2], [2, 2]]) {
+        let pieceTable = [];
+        for (let r1 = 0; r1 < BOARD_HEIGHT; ++r1) {
+            for (let c1 = 0; c1 < BOARD_WIDTH; ++c1) {
+                let dests: number[] = [];
+                function addDest(r2: number, c2: number) {
+                    if ( 0 <= r2 && r2 < BOARD_HEIGHT &&
+                         0 <= c2 && c2 < BOARD_WIDTH ) {
+                        const j = BOARD_WIDTH*r2 + c2;
+                        if (!dests.includes(j)) {
+                            dests.push(j);
+                        }
+                    }
+                }
+                addDest(r1 - d1, c1 - d2);
+                addDest(r1 - d1, c1 + d2);
+                addDest(r1 + d1, c1 - d2);
+                addDest(r1 + d1, c1 + d2);
+                addDest(r1 - d2, c1 - d1);
+                addDest(r1 - d2, c1 + d1);
+                addDest(r1 + d2, c1 - d1);
+                addDest(r1 + d2, c1 + d1);
+                pieceTable.push(Object.freeze(dests));
+            }
+        }
+        res.push(Object.freeze(pieceTable));
+    }
+    return Object.freeze(res);
+}
 
 export type ColoredPiece = {
     color: 0|1;
@@ -98,6 +135,6 @@ export type SimpleMove = Selection & {
 };
 
 export interface MoveGenerator {
-    generateSelectable: (gs: GameState) => Selection[],
-    generateDestinations: (gs: GameState, sel: Selection) => number[],
+    generateSelectable: (gs: GameState) => readonly Selection[],
+    generateDestinations: (gs: GameState, sel: Selection) => readonly number[],
 };
