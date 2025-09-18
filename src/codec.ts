@@ -75,7 +75,7 @@ class Decoder {
             if (this.pos === this.chars.length) {
                 throw new Error('No bits remaining!');
             }
-            let i = base64Digits.indexOf(this.chars[this.pos]);
+            const i = base64Digits.indexOf(this.chars[this.pos]);
             if (i === -1) {
                 throw new Error(`Invalid base64 digit at index ${this.pos}`);
             }

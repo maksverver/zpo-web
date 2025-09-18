@@ -25,10 +25,10 @@ export const moveTables = generateMoveTables();
 function generateMoveTables(): readonly(readonly (readonly number[])[])[] {
     const res = [];
     for (const [d1, d2] of [[0, 1], [1, 2], [1, 1], [0, 2], [2, 2]]) {
-        let pieceTable = [];
+        const pieceTable = [];
         for (let r1 = 0; r1 < BOARD_HEIGHT; ++r1) {
             for (let c1 = 0; c1 < BOARD_WIDTH; ++c1) {
-                let dests: number[] = [];
+                const dests: number[] = [];
                 function addDest(r2: number, c2: number) {
                     if ( 0 <= r2 && r2 < BOARD_HEIGHT &&
                          0 <= c2 && c2 < BOARD_WIDTH ) {
@@ -88,8 +88,8 @@ function getWazirs(board: readonly (undefined|ColoredPiece)[]): 0|1|2|3 {
     return mask as (0|1|2|3);
 }
 
-export function isGameOver({board}: GameState) {
-    return getWazirs(board) !== 3;
+export function isGameOver({turn, board}: GameState) {
+    return turn >= 2 && getWazirs(board) !== 3;
 }
 
 export function getWinner({board}: GameState): 0|1|undefined {
