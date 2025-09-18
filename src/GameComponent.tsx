@@ -4,7 +4,7 @@ import './GameComponent.css';
 
 const rowIds = 'abcdefgh';
 const colIds = '12345678';
-const playerNames = Object.freeze(['red', 'blue']);
+const playerClassNames = Object.freeze(['red', 'blue']);
 const fieldColorNames = Object.freeze(['white', 'black']);
 
 const pieceEmoji = Object.freeze([
@@ -44,7 +44,7 @@ function Field({r, c, cp, selected, selectable, onSelect}: FieldProps) {
 
 function PieceComponent({color, piece}: {color: 0|1, piece: PieceType}) {
     return (
-        <div className={`piece ${playerNames[color]}`} title={pieceNames[piece]}>
+        <div className={`piece ${playerClassNames[color]}`} title={pieceNames[piece]}>
             {pieceEmoji[color][piece]}
         </div>
     );

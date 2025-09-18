@@ -28,12 +28,39 @@ export type GameState = {
 
     // For each of 64 fields in row-major order, the piece on that field, if any.
     board: readonly (undefined|ColoredPiece)[],
+
+    // 0-based turn index (aka number of turns played so far).
+    turn: number,
 }
 
 export const initialGameState: GameState = {
-    hand: [initialPieceCounts, initialPieceCounts],
-    board: Array.from({length: PIECE_COUNT}),
+    board: Array.from({length: FIELD_COUNT}),
+    hand:  [initialPieceCounts, initialPieceCounts],
+    turn:  0,
 };
+
+// Returns a bitmask of the colors of wazirs on the board.
+function getWazirs(board: readonly (undefined|ColoredPiece)[]): 0|1|2|3 {
+    let mask = 0;
+    for (const cp of board) {
+        if (cp != null && cp.piece == Piece.WAZIR) {
+            mask |= 1 << cp.color;
+            if (mask === 3) break;
+        }
+    }
+    return mask as (0|1|2|3);
+}
+
+export function isGameOver({board}: GameState) {
+    return getWazirs(board) !== 3;
+}
+
+export function getWinner({board}: GameState): 0|1|undefined {
+    const mask = getWazirs(board);
+    if (mask === 1) return 0;
+    if (mask === 2) return 1;
+    return undefined;  // either 0 or 2 colors of wazirs left
+}
 
 // The stuff below is more for the UI components than general game logic,
 // but I can't be arsed to separate it out at the moment.
