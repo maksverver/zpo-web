@@ -1,5 +1,5 @@
 import { useCallback, useReducer, useRef, useState, type ChangeEvent } from 'react';
-import { FIELD_COUNT, getWinner, initialGameState, isGameOver, moveTables, type GameState, type MoveGenerator, type PieceType, type Selection, type SimpleMove, type Turn } from './game';
+import { parseTranscript, FIELD_COUNT, getWinner, initialGameState, isGameOver, moveTables, type GameState, type MoveGenerator, type PieceType, type Selection, type SimpleMove, type Turn, formatTurn, parseTurn, setupFields, executeSimpleMove, executeTurn, endTurn } from './game';
 import GameComponent from './GameComponent';
 import { decodeState, encodeState } from './codec';
 import './app.css';
@@ -110,17 +110,6 @@ const editMoveGenerator: MoveGenerator = {
     },
 };
 
-const setupFields = Object.freeze([
-    Object.freeze([
-          0,  1,  2,  3,  4,  5,  6,  7,
-          8,  9, 10, 11, 12, 13, 14, 15,
-    ]),
-    Object.freeze([
-         48, 49, 50, 51, 52, 53, 54, 55,
-         56, 57, 58, 59, 60, 61, 62, 63,
-    ]),
-]);
-
 // Allows only valid moves.
 const playMoveGenerator: MoveGenerator = {
     generateSelectable(gs: GameState): readonly Selection[] {
@@ -184,26 +173,6 @@ const playMoveGenerator: MoveGenerator = {
     },
 };
 
-function executeSimpleMove(gameState: GameState, move: SimpleMove): GameState {
-    const board = Array.from(gameState.board);
-    const hand = Array.from(gameState.hand, counts => Array.from(counts));
-    if (move.src === -1) {
-        --hand[move.color][move.piece];
-    } else {
-        board[move.src] = null;
-    }
-    if (move.dst === -1) {
-        ++hand[move.color][move.piece];
-    } else {
-        const old = board[move.dst];
-        if (old != null) {
-            ++hand[move.color][old.piece];
-        }
-        board[move.dst] = {color: move.color, piece: move.piece};
-    }
-    return {board, hand, turn: gameState.turn};
-}
-
 export type EditAppProps = {
     urlArgs: UrlArguments;
 };
@@ -245,14 +214,10 @@ type PlayAppAction = {
 };
 
 function reduceAppState(appState: PlayAppState, action: PlayAppAction) {
-    function incTurn(gameState: GameState): GameState {
-        return {...gameState, turn: gameState.turn + 1};
-    }
-
     switch (action.type) {
         case 'finish-setup':
             // TODO: construct move for history
-            return {...appState, gameState: incTurn(appState.gameState)};
+            return {...appState, gameState: endTurn(appState.gameState)};
 
         case 'play-move':
             {
@@ -260,7 +225,7 @@ function reduceAppState(appState: PlayAppState, action: PlayAppAction) {
                 // Automatically end turn after a single move, except during setup.
                 if (newGameState.turn >= 2) {
                     // TODO: construct move for history
-                    newGameState = incTurn(newGameState);
+                    newGameState = endTurn(newGameState);
                 }
                 return {...appState, gameState: newGameState};
             }
@@ -274,7 +239,7 @@ type PlayAppProps = {
 export function PlayApp({urlArgs}: PlayAppProps) {
     const [appState, dispatch] = useReducer(reduceAppState, {
         gameState: urlArgs.state,
-        history: urlArgs.history,
+        history: urlArgs.turns,
     });
     const {gameState} = appState;
 
@@ -333,14 +298,20 @@ export function MainApp() {
                 alert('Invalid state string!');
                 return;
             }
-            // encodeURIComponent isn't technically necessary here, because the
-            // state encoding uses the URL-safe base-64 alphabet, but it's
-            // better to be on the safe side.
-            params = 'state=' + encodeURIComponent(stateString);
+            params = formatUrlArguments({state});
         }
         if (source === 'move-list') {
-            const movesList = moveListRef.current?.value ?? '';
-            alert(movesList);
+            let turns = undefined;
+            try {
+                turns = parseTranscript(moveListRef.current?.value ?? '');
+            } catch (e) {
+                console.warn('Invalid transcript!', e);
+            }
+            if (turns == null) {
+                alert('Invalid transcript!');
+                return;
+            }
+            params = formatUrlArguments({turns});
         }
         document.location.href = `${destination}.html?${params}`;
     }
@@ -397,7 +368,6 @@ export function MainApp() {
                     />
                 </div>
             </div>
-            {/*
             <div>
                 <label>
                     <input
@@ -413,11 +383,14 @@ export function MainApp() {
                         rows={10} cols={40}
                          disabled={source !== 'move-list'}
                          ref={moveListRef}
-                    /><br/>
-                    <input type="file" onChange={handleFileChange}/>
+                    />
+                    <br/>
+                    <input type="file"
+                        disabled={source !== 'move-list'}
+                        onChange={handleFileChange}
+                    />
                 </div>
             </div>
-            */}
             <hr/>
             <div>
                 <button name="destination" value="edit" onClick={() => handleSubmit('edit')}>Edit</button>
@@ -429,26 +402,54 @@ export function MainApp() {
 }
 
 export type UrlArguments = {
-    history: Turn[],
     state: GameState,
+    turns: Turn[],
 };
 
-export function getUrlArguments(query: string = document.location.search) {
+export function formatUrlArguments(args: {state: GameState}|{turns: Turn[]}) {
+    let params = new URLSearchParams();
+    if ('state' in args) {
+        params.append('state', encodeState(args.state));
+    }
+    if ('turns' in args) {
+        params.append('history', args.turns.map(formatTurn).join('-'));
+    }
+    return params.toString();
+}
+
+export function parseUrlArguments(query: string = document.location.search): UrlArguments {
     const params = new URLSearchParams(query);
     const stateString = params.get('state');
+    let turns: Turn[] = [];
+    let state = initialGameState;
     if (stateString != null) {
         try {
-            return {
-                history: [],
-                state: decodeState(stateString),
-            };
+            state = decodeState(stateString);
         } catch (e) {
             console.error('Invalid state string!', stateString, e);
             alert('Invalid state string!');
         }
     }
-    return {
-        history: [],
-        state: initialGameState,
+    const turnsString = params.get('turns');
+    if (turnsString != null) {
+        const turnStrings = turnsString.split('-');
+        for (let i = 0; i < turnStrings.length; ++i) {
+            const turnString = turnStrings[i];
+            const turn = parseTurn(turnString);
+            if (turn == null) {
+                console.error('Invalid turn', i, turnString)
+                alert(`Turn ${i + 1} is invalid`);
+                break;
+            }
+            try {
+                state = executeTurn(state, turn);
+            } catch (e) {
+                console.error('Illegal turn', i, turnString, e);
+                alert(`Turn ${i + 1} is illegal!`);
+                break;
+            }
+            turns.push(turn);
+        };
     }
+    return { state, turns};
 }
