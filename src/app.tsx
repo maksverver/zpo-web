@@ -18,8 +18,9 @@ function GameStatus({state, onChangeState, finishSetupEnabled, onFinishSetup}: G
 
     function handleTurnClicked() {
         if (onChangeState == null) return;
-        const s = prompt('Turn', String(state.turn));
-        if (s == null || s === String(state.turn)) return;  // canceled/unchanged
+        const turnString = String(state.turn + 1);
+        const s = prompt('Turn', turnString);
+        if (s == null || s === turnString) return;  // canceled/unchanged
         const newTurn = Number.parseInt(s);
         if (!Number.isInteger(newTurn) || newTurn < 1 || newTurn > 1000000) {
             console.log('Invalid turn number!', s);
