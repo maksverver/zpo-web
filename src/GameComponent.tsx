@@ -81,7 +81,7 @@ function Hand({color, pieceCounts, selectable: selectablePieces, selected, onSel
 }
 
 type BoardProps = {
-    pieces: readonly (undefined|ColoredPiece)[];
+    pieces: readonly (null|ColoredPiece)[];
     selectable: Set<number>;
     selected: number,
     onSelect: (i: number) => void;
@@ -98,7 +98,7 @@ function Board({pieces, selectable, selected, onSelect}: BoardProps) {
                     selected={selected === i}
                     selectable={selectable.has(i)}
                     onSelect={() => onSelect(i)}
-                    cp={cp} />
+                    cp={cp == null ? undefined : cp} />
             );
         }
     }

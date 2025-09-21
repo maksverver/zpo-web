@@ -190,7 +190,7 @@ function executeSimpleMove(gameState: GameState, move: SimpleMove): GameState {
     if (move.src === -1) {
         --hand[move.color][move.piece];
     } else {
-        board[move.src] = undefined;
+        board[move.src] = null;
     }
     if (move.dst === -1) {
         ++hand[move.color][move.piece];

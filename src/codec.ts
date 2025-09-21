@@ -154,7 +154,7 @@ export function decodeState(str: string): GameState {
     const dec = new Decoder(str);
     // Pieces on board.
     const board = Array.from({length: FIELD_COUNT}, () =>
-            dec.getBit() === 0 ?  undefined : {
+            dec.getBit() === 0 ?  null : {
                 color:  dec.getBit(),
                 piece:  dec.getBit() === 1 ? Piece.ALFIL :
                         dec.getBit() === 1 ? Piece.DABBABA :

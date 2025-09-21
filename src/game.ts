@@ -64,7 +64,7 @@ export type GameState = {
     hand: readonly (readonly number[])[],
 
     // For each of 64 fields in row-major order, the piece on that field, if any.
-    board: readonly (undefined|ColoredPiece)[],
+    board: readonly (null|ColoredPiece)[],
 
     // 0-based turn index (aka number of turns played so far).
     turn: number,
@@ -77,7 +77,7 @@ export const initialGameState: GameState = {
 };
 
 // Returns a bitmask of the colors of wazirs on the board.
-function getWazirs(board: readonly (undefined|ColoredPiece)[]): 0|1|2|3 {
+function getWazirs(board: readonly (null|ColoredPiece)[]): 0|1|2|3 {
     let mask = 0;
     for (const cp of board) {
         if (cp != null && cp.piece == Piece.WAZIR) {
@@ -92,11 +92,11 @@ export function isGameOver({turn, board}: GameState) {
     return turn >= 2 && getWazirs(board) !== 3;
 }
 
-export function getWinner({board}: GameState): 0|1|undefined {
+export function getWinner({board}: GameState): 0|1|null {
     const mask = getWazirs(board);
     if (mask === 1) return 0;
     if (mask === 2) return 1;
-    return undefined;  // either 0 or 2 colors of wazirs left
+    return null;  // either 0 or 2 colors of wazirs left
 }
 
 export type SetupTurn = {
