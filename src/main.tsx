@@ -1,9 +1,9 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { PlayApp } from './app.tsx'
+import { MainApp } from './app.tsx'
 
 createRoot(document.getElementById('app')!).render(
   <StrictMode>
-    <PlayApp />
+    <MainApp />
   </StrictMode>,
 );

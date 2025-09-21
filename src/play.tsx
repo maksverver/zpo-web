@@ -1,9 +1,9 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { EditApp, getUrlArguments } from './app.tsx'
+import { getUrlArguments, PlayApp } from './app.tsx'
 
 createRoot(document.getElementById('app')!).render(
   <StrictMode>
-    <EditApp urlArgs={getUrlArguments()}/>
+    <PlayApp urlArgs={getUrlArguments()}/>
   </StrictMode>,
 );

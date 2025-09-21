@@ -1,4 +1,4 @@
-import { useCallback, useReducer, useState } from 'react';
+import { useCallback, useReducer, useRef, useState, type ChangeEvent } from 'react';
 import { FIELD_COUNT, getWinner, initialGameState, isGameOver, moveTables, type GameState, type MoveGenerator, type PieceType, type Selection, type SimpleMove, type Turn } from './game';
 import GameComponent from './GameComponent';
 import { decodeState, encodeState } from './codec';
@@ -204,8 +204,12 @@ function executeSimpleMove(gameState: GameState, move: SimpleMove): GameState {
     return {board, hand, turn: gameState.turn};
 }
 
-export function EditApp() {
-    const [gameState, setGameState] = useState<GameState>(initialGameState);
+export type EditAppProps = {
+    urlArgs: UrlArguments;
+};
+
+export function EditApp({urlArgs}: EditAppProps) {
+    const [gameState, setGameState] = useState<GameState>(urlArgs.state);
 
     const handleMove = useCallback((move: SimpleMove) => {
         setGameState(gameState => executeSimpleMove(gameState, move));
@@ -231,11 +235,6 @@ export function EditApp() {
 type PlayAppState = {
     gameState: GameState,
     history: Turn[],
-};
-
-const initialAppState: PlayAppState = {
-    gameState: initialGameState,
-    history: [],
 };
 
 type PlayAppAction = {
@@ -268,8 +267,15 @@ function reduceAppState(appState: PlayAppState, action: PlayAppAction) {
     }
 }
 
-export function PlayApp() {
-    const [appState, dispatch] = useReducer(reduceAppState, initialAppState);
+type PlayAppProps = {
+    urlArgs: UrlArguments,
+};
+
+export function PlayApp({urlArgs}: PlayAppProps) {
+    const [appState, dispatch] = useReducer(reduceAppState, {
+        gameState: urlArgs.state,
+        history: urlArgs.history,
+    });
     const {gameState} = appState;
 
     const handleMove = useCallback((move: SimpleMove) => {
@@ -300,4 +306,149 @@ export function PlayApp() {
             </div>
         </div>
     );
+}
+
+export function MainApp() {
+    const [source, setSource] = useState('empty-board');
+
+    const stateStringRef = useRef<HTMLInputElement>(null);
+    const moveListRef    = useRef<HTMLTextAreaElement>(null);
+
+    const handleSourceChange = useCallback(
+        (e: ChangeEvent<HTMLInputElement>) => {
+            setSource(e.target.value);
+        }, []);
+
+    function handleSubmit(destination: 'edit'|'play') {
+        let params = '';
+        if (source === 'state-string') {
+            const stateString = stateStringRef.current?.value ?? '';
+            let state = undefined;
+            try {
+                state = decodeState(stateString);
+            } catch (e) {
+                console.warn('Invalid state string!', stateString, e);
+            }
+            if (state == null) {
+                alert('Invalid state string!');
+                return;
+            }
+            // encodeURIComponent isn't technically necessary here, because the
+            // state encoding uses the URL-safe base-64 alphabet, but it's
+            // better to be on the safe side.
+            params = 'state=' + encodeURIComponent(stateString);
+        }
+        if (source === 'move-list') {
+            const movesList = moveListRef.current?.value ?? '';
+            alert(movesList);
+        }
+        document.location.href = `${destination}.html?${params}`;
+    }
+
+    function handleFileChange(ev: ChangeEvent<HTMLInputElement>) {
+        const reader = new FileReader();
+        const files = ev.target.files;
+        if (files == null) return;
+        reader.readAsText(files[0], "UTF-8");
+        reader.onload = (e) => {
+            const text = e.target?.result;
+            const textArea = moveListRef?.current;
+            if (text != null && textArea != null) {
+                textArea.value = text as string;
+            }
+        }
+        reader.onerror = (e) => {
+            console.error('Error reading file!', e);
+            alert('Error reading file!');
+        }
+    }
+
+    return (
+        <div className="main">
+            <h1>0·1</h1>
+            <div>
+                <label>
+                    <input
+                        type="radio"
+                        name="source"
+                        value="empty-board"
+                        checked={source === 'empty-board'}
+                        onChange={handleSourceChange}
+                    /> {' '} Empty board
+                </label>
+            </div>
+            <div>
+                <label>
+                    <input
+                        type="radio"
+                        name="source"
+                        value="state-string"
+                        checked={source === 'state-string'}
+                        onChange={handleSourceChange}
+                    /> {' '} From state string
+                </label>
+                <div>
+                    <input
+                        className="code"
+                        type="text"
+                        name="state-string"
+                        ref={stateStringRef}
+                        disabled={source !== 'state-string'}
+                    />
+                </div>
+            </div>
+            {/*
+            <div>
+                <label>
+                    <input
+                        type="radio"
+                        name="source"
+                        value="move-list"
+                        checked={source === 'move-list'}
+                        onChange={handleSourceChange}
+                    /> {' '} From move list
+                </label>
+                <div>
+                    <textarea
+                        rows={10} cols={40}
+                         disabled={source !== 'move-list'}
+                         ref={moveListRef}
+                    /><br/>
+                    <input type="file" onChange={handleFileChange}/>
+                </div>
+            </div>
+            */}
+            <hr/>
+            <div>
+                <button name="destination" value="edit" onClick={() => handleSubmit('edit')}>Edit</button>
+                {' '}
+                <button name="destination" value="play" onClick={() => handleSubmit('play')}>Play</button>
+            </div>
+        </div>
+    )
+}
+
+export type UrlArguments = {
+    history: Turn[],
+    state: GameState,
+};
+
+export function getUrlArguments(query: string = document.location.search) {
+    const params = new URLSearchParams(query);
+    const stateString = params.get('state');
+    if (stateString != null) {
+        try {
+            return {
+                history: [],
+                state: decodeState(stateString),
+            };
+        } catch (e) {
+            console.error('Invalid state string!', stateString, e);
+            alert('Invalid state string!');
+        }
+    }
+    return {
+        history: [],
+        state: initialGameState,
+    }
 }

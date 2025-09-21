@@ -7,7 +7,7 @@ export default defineConfig({
   base: '',  // use relative instead of absolute paths
   build: {
     rollupOptions: {
-      input: ['index.html', 'edit.html'],
+      input: ['index.html', 'play.html', 'edit.html'],
     },
   },
 });

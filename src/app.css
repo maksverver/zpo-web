@@ -27,3 +27,7 @@
 .game-status .code {
     font: 12px monospace;
 }
+
+.main input.code {
+    font: 12px monospace;
+}
