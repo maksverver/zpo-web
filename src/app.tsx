@@ -1,4 +1,4 @@
-import { useCallback, useReducer, useRef, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ChangeEvent } from 'react';
 import { parseTranscript, FIELD_COUNT, getWinner, initialGameState, isGameOver, moveTables, type GameState, type MoveGenerator, type PieceType, type Selection, type SimpleMove, type Turn, formatTurn, parseTurn, setupFields, executeSimpleMove, executeTurn, endTurn, createSetupTurn, createTurnFromSimpleMove } from './game';
 import GameComponent from './GameComponent';
 import { decodeState, encodeState } from './codec';
@@ -204,11 +204,39 @@ export function EditApp({urlArgs}: EditAppProps) {
 }
 
 type MoveListProps = {
-    turns: Turn[];
+    turns: readonly Turn[];
+    redoableTurns?: Turn[];
     onUndo?: () => void;
+    onRedo?: () => void;
 }
 
-export function MoveList({turns, onUndo}: MoveListProps) {
+export function MoveList({turns, redoableTurns, onUndo, onRedo}: MoveListProps) {
+    const canUndo = onUndo != null && turns.length > 0;
+    const canRedo = onRedo != null && redoableTurns != null && redoableTurns.length > 0;
+
+    // Allow undo/redo with ctrl-z/y
+    useEffect(() => {
+        function handleKeyDown(ev: KeyboardEvent) {
+            if (ev.ctrlKey) {
+                if (ev.key === 'z') {
+                    if (canUndo) {
+                        ev.preventDefault();
+                        onUndo!();
+                    }
+                } else if (ev.key === 'y') {
+                    if (canRedo) {
+                        ev.preventDefault();
+                        onRedo!();
+                    }
+                }
+            }
+        }
+        if (canUndo || canRedo) {
+            document.addEventListener('keydown', handleKeyDown);
+            return () => document.removeEventListener('keydown', handleKeyDown);
+        }
+    }, [onUndo, onRedo, canUndo, canRedo]);
+
     function formatFancyTurn(turn: Turn) {
         const s = formatTurn(turn);
         if (s.length <= 8) {
@@ -216,6 +244,7 @@ export function MoveList({turns, onUndo}: MoveListProps) {
         }
         return <React.Fragment>{s.substring(0,8)}<br/>{s.substring(8)}</React.Fragment>
     }
+
     return (
         <div className="move-list">
             {/*
@@ -231,18 +260,30 @@ export function MoveList({turns, onUndo}: MoveListProps) {
                     <tr><th>0.</th><td colSpan={2} align="center">Start</td></tr>
                     {
                         turns.map((turn, i) => (
-                            <tr key={i}><th>{i + 1}.</th>
+                            <tr key={i}>
+                                <th>{i + 1}.</th>
                                 {i % 2 === 1 ? <td/> : undefined}
                                 <td>{formatFancyTurn(turn)}</td>
                                 {i % 2 === 0 ? <td/> : undefined}
                             </tr>
                         ))
                     }
+                    {
+                        redoableTurns != null && redoableTurns.map((turn, i) => (
+                            <tr className="redoable" key={turns.length + i}>
+                                <th>{turns.length + i + 1}.</th>
+                                {(turns.length + i) % 2 === 1 ? <td/> : undefined}
+                                <td>{formatFancyTurn(turn)}</td>
+                                {(turns.length + i) % 2 === 0 ? <td/> : undefined}
+                            </tr>
+                        ))
+                    }
                 </tbody>
             </table>
-            {onUndo != null &&
+            {(onUndo != null || onRedo != null) &&
                 <div className="buttons bottom">
-                    <button disabled={turns.length === 0} onClick={onUndo}>Undo</button>
+                    <button disabled={!canUndo} onClick={onUndo} title="Undo (ctrl-z)">Undo</button>
+                    <button disabled={!canRedo} onClick={onRedo} title="Redo (ctrl-y)">Redo</button>
                 </div>}
         </div>
     );
@@ -252,6 +293,7 @@ type PlayAppState = {
     currentState: GameState,
     states: GameState[],
     turns: Turn[],
+    redoStack: [Turn, GameState][],
 };
 
 type PlayAppAction = {
@@ -261,10 +303,12 @@ type PlayAppAction = {
     move: SimpleMove,
 } | {
     type: 'undo-move',
+} | {
+    type: 'redo-move',
 };
 
 function reducePlayAppState(appState: PlayAppState, action: PlayAppAction): PlayAppState {
-    const {currentState, states, turns} = appState;
+    const {currentState, states, turns, redoStack} = appState;
     const nextPlayer = currentState.turn % 2 as 0|1;
     switch (action.type) {
         case 'finish-setup': {
@@ -273,6 +317,7 @@ function reducePlayAppState(appState: PlayAppState, action: PlayAppAction): Play
                 currentState: nextState,
                 turns: [...turns, createSetupTurn(nextState.board, nextPlayer)],
                 states: [...states, nextState],
+                redoStack: [],
             };
         }
         case 'play-move': {
@@ -280,7 +325,7 @@ function reducePlayAppState(appState: PlayAppState, action: PlayAppAction): Play
             if (nextState.turn < 2) {
                 // Setup: apply moves to current state without creating a turn
                 // (which will be done by a finish-setup action).
-                return { currentState: nextState, turns, states };
+                return { currentState: nextState, turns, states, redoStack };
             } else {
                 // Play: create a turn.
                 nextState = endTurn(nextState);
@@ -288,6 +333,7 @@ function reducePlayAppState(appState: PlayAppState, action: PlayAppAction): Play
                     currentState: nextState,
                     turns: [...turns, createTurnFromSimpleMove(action.move)],
                     states: [...states, nextState],
+                    redoStack: [],
                 };
             }
         }
@@ -297,9 +343,24 @@ function reducePlayAppState(appState: PlayAppState, action: PlayAppAction): Play
                     currentState: states.at(-2)!,
                     turns: turns.slice(0, -1),
                     states: states.slice(0, -1),
+                    redoStack: [...redoStack, [turns.at(-1)!, states.at(-1)!]],
                 }
             } else {
                 console.warn('Empty move history; cannot undo!');
+                return appState;
+            }
+        }
+        case 'redo-move': {
+            if (redoStack.length) {
+                const [nextTurn, nextState] = redoStack.at(-1);
+                return {
+                    currentState: nextState,
+                    turns: [...turns, nextTurn],
+                    states: [...states, nextState],
+                    redoStack: redoStack.slice(0, -1),
+                }
+            } else {
+                console.warn('Empty redo stack; cannot redo!');
                 return appState;
             }
         }
@@ -315,18 +376,18 @@ export function PlayApp({urlArgs}: PlayAppProps) {
         currentState: urlArgs.states.at(-1)!,
         states: urlArgs.states,
         turns: urlArgs.turns,
+        redoStack: [],
     });
-    const {currentState, turns} = appState;
+    const {currentState, turns, redoStack} = appState;
 
-    const handleFinishSetup = useCallback(() => {
-        dispatch({type: 'finish-setup'});
-    }, []);
     const handleMove = useCallback((move: SimpleMove) => {
         dispatch({type: 'play-move', move});
     }, []);
-    const handleUndo = useCallback(() => {
-        dispatch({type: 'undo-move'});
-    }, []);
+    const handleFinishSetup = useCallback(() => dispatch({type: 'finish-setup'}), []);
+    const handleUndo = useCallback(() => dispatch({type: 'undo-move'}), []);
+    const handleRedo = useCallback(() => dispatch({type: 'redo-move'}), []);
+
+    const redoableTurns = useMemo(() => redoStack.map(([turn]) => turn).reverse(), [redoStack]);
 
     const finishSetupEnabled =
         currentState.turn < 2
@@ -348,7 +409,12 @@ export function PlayApp({urlArgs}: PlayAppProps) {
                         onMove={handleMove}
                     />
                 </div>
-                <MoveList turns={turns} onUndo={handleUndo}/>
+                <MoveList
+                    turns={turns}
+                    redoableTurns={redoableTurns}
+                    onUndo={handleUndo}
+                    onRedo={handleRedo}
+                />
             </div>
         </div>
     );
