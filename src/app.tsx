@@ -1,8 +1,9 @@
 import { useCallback, useReducer, useRef, useState, type ChangeEvent } from 'react';
-import { parseTranscript, FIELD_COUNT, getWinner, initialGameState, isGameOver, moveTables, type GameState, type MoveGenerator, type PieceType, type Selection, type SimpleMove, type Turn, formatTurn, parseTurn, setupFields, executeSimpleMove, executeTurn, endTurn } from './game';
+import { parseTranscript, FIELD_COUNT, getWinner, initialGameState, isGameOver, moveTables, type GameState, type MoveGenerator, type PieceType, type Selection, type SimpleMove, type Turn, formatTurn, parseTurn, setupFields, executeSimpleMove, executeTurn, endTurn, createSetupTurn, createTurnFromSimpleMove } from './game';
 import GameComponent from './GameComponent';
 import { decodeState, encodeState } from './codec';
 import './app.css';
+import React from 'react';
 
 const playerNames = Object.freeze(['Red', 'Blue']);
 
@@ -23,7 +24,7 @@ function GameStatus({state, onChangeState, finishSetupEnabled, onFinishSetup}: G
         if (s == null || s === turnString) return;  // canceled/unchanged
         const newTurn = Number.parseInt(s);
         if (!Number.isInteger(newTurn) || newTurn < 1 || newTurn > 1000000) {
-            console.log('Invalid turn number!', s);
+            console.error('Invalid turn number!', s);
             alert('Invalid turn number!');
             return;
         }
@@ -38,7 +39,7 @@ function GameStatus({state, onChangeState, finishSetupEnabled, onFinishSetup}: G
         try {
             newState = decodeState(s.trim());
         } catch (e) {
-            console.log('Invalid state string!', s, e);
+            console.error('Invalid state string!', s, e);
             alert('Invalid state string!');
             return;
         }
@@ -179,7 +180,7 @@ export type EditAppProps = {
 };
 
 export function EditApp({urlArgs}: EditAppProps) {
-    const [gameState, setGameState] = useState<GameState>(urlArgs.state);
+    const [gameState, setGameState] = useState<GameState>(urlArgs.states.at(-1)!);
 
     const handleMove = useCallback((move: SimpleMove) => {
         setGameState(gameState => executeSimpleMove(gameState, move));
@@ -187,7 +188,7 @@ export function EditApp({urlArgs}: EditAppProps) {
 
     return (
         <div className="app">
-            <div className="game-holder">
+            <div className="game-with-status">
                 <GameStatus
                     state={gameState}
                     onChangeState={setGameState}
@@ -202,9 +203,55 @@ export function EditApp({urlArgs}: EditAppProps) {
     );
 }
 
+type MoveListProps = {
+    turns: Turn[];
+    onUndo?: () => void;
+}
+
+export function MoveList({turns, onUndo}: MoveListProps) {
+    function formatFancyTurn(turn: Turn) {
+        const s = formatTurn(turn);
+        if (s.length <= 8) {
+            return s;
+        }
+        return <React.Fragment>{s.substring(0,8)}<br/>{s.substring(8)}</React.Fragment>
+    }
+    return (
+        <div className="move-list">
+            {/*
+            <div className="buttons top">
+                <button disabled={true}>⏮️</button>
+                <button disabled={true}>◀️</button>
+                <button disabled={true}>▶️</button>
+                <button disabled={true}>⏭️</button>
+            </div>
+            */}
+            <table>
+                <tbody>
+                    <tr><th>0.</th><td colSpan={2} align="center">Start</td></tr>
+                    {
+                        turns.map((turn, i) => (
+                            <tr key={i}><th>{i + 1}.</th>
+                                {i % 2 === 1 ? <td/> : undefined}
+                                <td>{formatFancyTurn(turn)}</td>
+                                {i % 2 === 0 ? <td/> : undefined}
+                            </tr>
+                        ))
+                    }
+                </tbody>
+            </table>
+            {onUndo != null &&
+                <div className="buttons bottom">
+                    <button disabled={turns.length === 0} onClick={onUndo}>Undo</button>
+                </div>}
+        </div>
+    );
+}
+
 type PlayAppState = {
-    gameState: GameState,
-    history: Turn[],
+    currentState: GameState,
+    states: GameState[],
+    turns: Turn[],
 };
 
 type PlayAppAction = {
@@ -212,24 +259,50 @@ type PlayAppAction = {
 } | {
     type: 'play-move',
     move: SimpleMove,
+} | {
+    type: 'undo-move',
 };
 
-function reduceAppState(appState: PlayAppState, action: PlayAppAction) {
+function reducePlayAppState(appState: PlayAppState, action: PlayAppAction): PlayAppState {
+    const {currentState, states, turns} = appState;
+    const nextPlayer = currentState.turn % 2 as 0|1;
     switch (action.type) {
-        case 'finish-setup':
-            // TODO: construct move for history
-            return {...appState, gameState: endTurn(appState.gameState)};
-
-        case 'play-move':
-            {
-                let newGameState = executeSimpleMove(appState.gameState, action.move);
-                // Automatically end turn after a single move, except during setup.
-                if (newGameState.turn >= 2) {
-                    // TODO: construct move for history
-                    newGameState = endTurn(newGameState);
-                }
-                return {...appState, gameState: newGameState};
+        case 'finish-setup': {
+            const nextState = endTurn(currentState);
+            return {
+                currentState: nextState,
+                turns: [...turns, createSetupTurn(nextState.board, nextPlayer)],
+                states: [...states, nextState],
+            };
+        }
+        case 'play-move': {
+            let nextState = executeSimpleMove(currentState, action.move);
+            if (nextState.turn < 2) {
+                // Setup: apply moves to current state without creating a turn
+                // (which will be done by a finish-setup action).
+                return { currentState: nextState, turns, states };
+            } else {
+                // Play: create a turn.
+                nextState = endTurn(nextState);
+                return {
+                    currentState: nextState,
+                    turns: [...turns, createTurnFromSimpleMove(action.move)],
+                    states: [...states, nextState],
+                };
             }
+        }
+        case 'undo-move': {
+            if (turns.length > 0 && states.length > 1) {
+                return {
+                    currentState: states.at(-2)!,
+                    turns: turns.slice(0, -1),
+                    states: states.slice(0, -1),
+                }
+            } else {
+                console.warn('Empty move history; cannot undo!');
+                return appState;
+            }
+        }
     }
 }
 
@@ -238,37 +311,44 @@ type PlayAppProps = {
 };
 
 export function PlayApp({urlArgs}: PlayAppProps) {
-    const [appState, dispatch] = useReducer(reduceAppState, {
-        gameState: urlArgs.state,
-        history: urlArgs.turns,
+    const [appState, dispatch] = useReducer(reducePlayAppState, {
+        currentState: urlArgs.states.at(-1)!,
+        states: urlArgs.states,
+        turns: urlArgs.turns,
     });
-    const {gameState} = appState;
+    const {currentState, turns} = appState;
 
-    const handleMove = useCallback((move: SimpleMove) => {
-        dispatch({type: 'play-move', move});
-    }, []);
     const handleFinishSetup = useCallback(() => {
         dispatch({type: 'finish-setup'});
     }, []);
+    const handleMove = useCallback((move: SimpleMove) => {
+        dispatch({type: 'play-move', move});
+    }, []);
+    const handleUndo = useCallback(() => {
+        dispatch({type: 'undo-move'});
+    }, []);
 
     const finishSetupEnabled =
-        gameState.turn < 2
-            ? setupFields[gameState.turn % 2].every(i => gameState.board[i] != null)
+        currentState.turn < 2
+            ? setupFields[currentState.turn % 2].every(i => currentState.board[i] != null)
             : undefined;
 
     return (
         <div className="app">
-            <div className="game-holder">
-                <GameStatus
-                    state={gameState}
-                    finishSetupEnabled={finishSetupEnabled}
-                    onFinishSetup={handleFinishSetup}
-                />
-                <GameComponent
-                    moveGenerator={playMoveGenerator}
-                    gameState={gameState}
-                    onMove={handleMove}
-                />
+            <div className="game-with-move-list">
+                <div className="game-with-status">
+                    <GameStatus
+                        state={currentState}
+                        finishSetupEnabled={finishSetupEnabled}
+                        onFinishSetup={handleFinishSetup}
+                    />
+                    <GameComponent
+                        moveGenerator={playMoveGenerator}
+                        gameState={currentState}
+                        onMove={handleMove}
+                    />
+                </div>
+                <MoveList turns={turns} onUndo={handleUndo}/>
             </div>
         </div>
     );
@@ -403,7 +483,11 @@ export function MainApp() {
 }
 
 export type UrlArguments = {
-    state: GameState,
+    // List of game states. Must not be empty.
+    states: GameState[],
+
+    // List of turns. length turns === length.states - 1.
+    // gamestate[i] is the state before turn[i] and after turn[i-1].
     turns: Turn[],
 };
 
@@ -420,20 +504,15 @@ export function formatUrlArguments(args: {state: GameState}|{turns: Turn[]}) {
 
 export function parseUrlArguments(query: string = document.location.search): UrlArguments {
     const params = new URLSearchParams(query);
-    const stateString = params.get('state');
-    let turns: Turn[] = [];
-    let state = initialGameState;
-    if (stateString != null) {
-        try {
-            state = decodeState(stateString);
-        } catch (e) {
-            console.error('Invalid state string!', stateString, e);
-            alert('Invalid state string!');
-        }
-    }
+
+    // Parse `turns` parameter:
     const turnsString = params.get('turns');
     if (turnsString != null) {
+        let state = initialGameState;
+        let states: GameState[] = [];
+        states.push(state);
         const turnStrings = turnsString.split('-');
+        let turns: Turn[] = [];
         for (let i = 0; i < turnStrings.length; ++i) {
             const turnString = turnStrings[i];
             const turn = parseTurn(turnString);
@@ -450,7 +529,26 @@ export function parseUrlArguments(query: string = document.location.search): Url
                 break;
             }
             turns.push(turn);
+            states.push(state);
         };
+        return {states, turns};
     }
-    return { state, turns };
+
+    // Parse `state` parameter:
+    const stateString = params.get('state');
+    if (stateString != null) {
+        let state = undefined;
+        try {
+            state = decodeState(stateString);
+        } catch (e) {
+            console.error('Invalid state string!', stateString, e);
+            alert('Invalid state string!');
+        }
+        if (state != undefined) {
+            return {states: [state], turns: []};
+        }
+    }
+
+    // Default: start from initial game state (empty board).
+    return {states: [initialGameState], turns: []};
 }

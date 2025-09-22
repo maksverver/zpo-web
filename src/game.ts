@@ -1,3 +1,5 @@
+import { assertLength } from "./util";
+
 export const BOARD_WIDTH  =  8;
 export const BOARD_HEIGHT =  8;
 export const FIELD_COUNT  = 64;
@@ -38,6 +40,9 @@ export const PIECE_COUNT = 5;
 // can have more than this number of pieces on the board thanks to captures and
 // drops.)
 export const initialPieceCounts = Object.freeze([1, 1, 2, 4, 8]);
+
+// Total number of pieces each player starts with.
+export const INITIAL_PIECE_COUNT = 16;
 
 // moveTables[piece][src] is an array of possible destinations
 export const moveTables = generateMoveTables();
@@ -122,7 +127,7 @@ export function getWinner({board}: GameState): 0|1|null {
 export type SetupTurn = {
     type: 'setup',
     color: 0|1,
-    pieces: PieceType[] & {length: 16}
+    pieces: PieceType[] & {length: typeof INITIAL_PIECE_COUNT}
 };
 
 export type MoveTurn = {
@@ -163,7 +168,7 @@ export function formatTurn(turn: Turn): string {
 // Decodes a single turn string, or returns null if the turn could
 // not be parsed.
 export function parseTurn(s: string): null|Turn {
-    if (s.length === 16) {
+    if (s.length === INITIAL_PIECE_COUNT) {
         let color: 0|1;
         if (pieceIds[0].includes(s[0])) {
             color = 0;
@@ -184,7 +189,7 @@ export function parseTurn(s: string): null|Turn {
         return {
             type: 'setup',
             color: color,
-            pieces: pieces as (PieceType[] & {length: 16}),
+            pieces: assertLength(pieces, INITIAL_PIECE_COUNT),
         };
     } else if (s.length === 4) {
         const r1 = rowIds.indexOf(s[0]);
@@ -233,7 +238,6 @@ export function endTurn(gameState: GameState): GameState {
 // Executes a turn, if possible. It doesn't check if the turn is legal.
 // If the turn is definitely illegal an exception may be thrown.
 export function executeTurn(gameState: GameState, turn: Turn): GameState {
-
     switch (turn.type) {
         case 'setup': {
             const {color} = turn;
@@ -337,6 +341,28 @@ export function executeSimpleMove(gameState: GameState, move: SimpleMove): GameS
     return {board, hand, turn: gameState.turn};
 }
 
+export function createSetupTurn(board: readonly (null|ColoredPiece)[], color: 0|1): SetupTurn {
+    const pieces = assertLength(setupFields[color].map(field => {
+        const cp = board[field];
+        if (cp == null || cp.color !== color) {
+            throw new Error('Missing piece in setup!');
+        }
+        return cp.piece;
+    }), 16);
+    return { type: 'setup', color, pieces };
+}
+
+export function createTurnFromSimpleMove(move: SimpleMove): MoveTurn|DropTurn {
+    const {color, piece, src, dst} = move;
+    if (dst === -1) {
+        throw new Error('Invalid destination for turn!');
+    }
+    if (src === -1) {
+        return {type: 'drop', color, piece, dst};
+    } else {
+        return {type: 'move', src, dst};
+    }
+}
 
 export interface MoveGenerator {
     generateSelectable: (gs: GameState) => readonly Selection[],

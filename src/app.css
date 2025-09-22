@@ -5,7 +5,14 @@
     font: 16px sans-serif;
 }
 
-.game-holder {
+.game-with-move-list {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.game-with-status {
     display: flex;
     flex-direction: column;
 }
@@ -30,4 +37,46 @@
 
 .main input.code {
     font: 12px monospace;
+}
+
+.move-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    padding: 4px 16px;
+    max-height: 700px;
+    overflow-y: auto;
+    font: 12px monospace;
+}
+
+.move-list .buttons {
+    display: flex;
+    flex-direction: row;
+}
+
+.move-list .buttons button {
+    flex: 1;
+    padding: 4px 8px;
+}
+
+.move-list table {
+    border-spacing: 0;
+}
+.move-list td,
+.move-list th {
+    padding: 2px 4px;
+}
+
+.move-list th {
+    color: grey;
+    font-weight: normal;
+}
+
+.move-list tr:nth-child(odd) {
+    background: #e0e0e0;
+}
+
+.move-list tr:nth-child(even) {
+    background: #f0f0f0;
 }
