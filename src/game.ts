@@ -277,14 +277,24 @@ export function executeTurn(gameState: GameState, turn: Turn): GameState {
 // valid in the context of the game!
 //
 // The transcript may contain any amount of whitespace between turns.
-// Comments, which start with '#' and end at the end of the line, are removed.
+//
+// Move numbers, which start at the beginning of the line and end with a '.',
+// are removed (e.g. '1. a1b2' parses as 'a1b2').
+//
+// Comments, which start with '#' and end at the end of the line, are removed
+// (e.g. 'a1b2 # bla' parses as 'a1b2').
+//
+// The move "Start" is filtered out. (This allows easy copy/pasting move lists
+// from the Codecup site.)
 //
 // Throws an exception if decoding fails.
 export function parseTranscript(transcript: string): Turn[] {
     return transcript
+        .replaceAll(/^\d+[.]/gm, '')
+        .replaceAll(/#.*$/gm, '')
         .trim()
-        .replaceAll(/#.*/g, '')
         .split(/\s+/)
+        .filter(s => s !== 'Start')
         .map(moveString => {
             const move = parseTurn(moveString);
             if (move == null) {

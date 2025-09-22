@@ -413,7 +413,7 @@ export function formatUrlArguments(args: {state: GameState}|{turns: Turn[]}) {
         params.append('state', encodeState(args.state));
     }
     if ('turns' in args) {
-        params.append('history', args.turns.map(formatTurn).join('-'));
+        params.append('turns', args.turns.map(formatTurn).join('-'));
     }
     return params.toString();
 }
@@ -452,5 +452,5 @@ export function parseUrlArguments(query: string = document.location.search): Url
             turns.push(turn);
         };
     }
-    return { state, turns};
+    return { state, turns };
 }
