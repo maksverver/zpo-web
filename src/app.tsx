@@ -4,6 +4,7 @@ import GameComponent from './GameComponent';
 import { decodeState, encodeState } from './codec';
 import './app.css';
 import React from 'react';
+import { classNames } from './util';
 
 const playerNames = Object.freeze(['Red', 'Blue']);
 
@@ -212,36 +213,54 @@ export function EditApp({urlArgs}: EditAppProps) {
 type MoveListProps = {
     turns: readonly Turn[];
     redoableTurns?: Turn[];
+    selected?: number,
     onUndo?: () => void;
     onRedo?: () => void;
+    onSelect?: (i: number) => void;
 }
 
-export function MoveList({turns, redoableTurns, onUndo, onRedo}: MoveListProps) {
+export function MoveList({turns, redoableTurns, selected, onUndo, onRedo, onSelect}: MoveListProps) {
     const canUndo = onUndo != null && turns.length > 0;
     const canRedo = onRedo != null && redoableTurns != null && redoableTurns.length > 0;
+    const canPrev = onSelect != null && selected != null && selected >= 1;
+    const canNext = onSelect != null && selected != null && selected < turns.length;
+
+    function goToPrev() { if (canPrev) onSelect(selected - 1); }
+    function goToNext() { if (canNext) onSelect(selected + 1); }
+    function goToFrst() { if (canPrev) onSelect(0); }
+    function goToLast() { if (canNext) onSelect(turns.length); }
 
     // Allow undo/redo with ctrl-z/y
     useEffect(() => {
         function handleKeyDown(ev: KeyboardEvent) {
             if (ev.ctrlKey) {
-                if (ev.key === 'z') {
-                    if (canUndo) {
-                        ev.preventDefault();
-                        onUndo!();
-                    }
-                } else if (ev.key === 'y') {
-                    if (canRedo) {
-                        ev.preventDefault();
-                        onRedo!();
-                    }
+                const callback = {
+                    'z': canUndo ? onUndo : undefined,
+                    'y': canRedo ? onRedo : undefined,
+                }[ev.key];
+                if (callback != null) {
+                    ev.preventDefault();
+                    callback();
+                }
+            } else {
+                const callback = {
+                    'ArrowLeft':  goToPrev,
+                    'ArrowRight': goToNext,
+                    'Home':       goToFrst,
+                    'End':        goToLast,
+                }[ev.key];
+                if (callback != null) {
+                    ev.preventDefault();
+                    callback();
+                    return;
                 }
             }
         }
-        if (canUndo || canRedo) {
+        if (canUndo || canRedo || canPrev || canNext) {
             document.addEventListener('keydown', handleKeyDown);
             return () => document.removeEventListener('keydown', handleKeyDown);
         }
-    }, [onUndo, onRedo, canUndo, canRedo]);
+    });
 
     function formatFancyTurn(turn: Turn) {
         const s = formatTurn(turn);
@@ -253,36 +272,57 @@ export function MoveList({turns, redoableTurns, onUndo, onRedo}: MoveListProps) 
 
     return (
         <div className="move-list">
-            {/*
-            <div className="buttons top">
-                <button disabled={true}>⏮️</button>
-                <button disabled={true}>◀️</button>
-                <button disabled={true}>▶️</button>
-                <button disabled={true}>⏭️</button>
-            </div>
-            */}
+            {selected != null && onSelect != null &&
+                <div className="buttons top">
+                    <button disabled={!canPrev} onClick={goToFrst}>⏮️</button>
+                    <button disabled={!canPrev} onClick={goToPrev}>◀️</button>
+                    <button disabled={!canNext} onClick={goToNext}>▶️</button>
+                    <button disabled={!canNext} onClick={goToLast}>⏭️</button>
+                </div>
+            }
             <table>
                 <tbody>
-                    <tr><th>0.</th><td colSpan={2} align="center">Start</td></tr>
+                    <tr className={classNames({
+                            selectable: onSelect != null,
+                            selected: selected === 0,
+                        })}
+                        onClick={onSelect == null ? undefined : () => onSelect(0)}
+                    ><th>0.</th><td colSpan={2} align="center">Start</td></tr>
                     {
-                        turns.map((turn, i) => (
-                            <tr key={i}>
-                                <th>{i + 1}.</th>
-                                {i % 2 === 1 ? <td/> : undefined}
-                                <td>{formatFancyTurn(turn)}</td>
-                                {i % 2 === 0 ? <td/> : undefined}
-                            </tr>
-                        ))
+                        turns.map((turn, i) => {
+                            const j = i + 1;
+                            return (
+                                <tr key={j}
+                                    className={classNames({
+                                        selectable: onSelect != null,
+                                        selected: selected === j,
+                                    })}
+                                    onClick={onSelect == null ? undefined : () => onSelect(j)}
+                                ><th>{j}.</th>
+                                    {j % 2 === 0 ? <td/> : undefined}
+                                    <td>{formatFancyTurn(turn)}</td>
+                                    {j % 2 === 1 ? <td/> : undefined}
+                                </tr>
+                            );
+                        })
                     }
                     {
-                        redoableTurns != null && redoableTurns.map((turn, i) => (
-                            <tr className="redoable" key={turns.length + i}>
-                                <th>{turns.length + i + 1}.</th>
-                                {(turns.length + i) % 2 === 1 ? <td/> : undefined}
-                                <td>{formatFancyTurn(turn)}</td>
-                                {(turns.length + i) % 2 === 0 ? <td/> : undefined}
-                            </tr>
-                        ))
+                        redoableTurns != null && redoableTurns.map((turn, i) => {
+                            const j = turns.length + i + 1;
+                            return (
+                                <tr key={j}
+                                    className={classNames({
+                                        redoable: true,
+                                        selectable: onSelect != null,
+                                        selected: selected === j,
+                                    })}
+                                ><th>{j}.</th>
+                                    {j % 2 === 0 ? <td/> : undefined}
+                                    <td>{formatFancyTurn(turn)}</td>
+                                    {j % 2 === 1 ? <td/> : undefined}
+                                </tr>
+                            );
+                        })
                     }
                 </tbody>
             </table>
@@ -430,7 +470,15 @@ type ViewAppProps = {
 
 export function ViewApp({urlArgs}: ViewAppProps) {
     const {states, turns} = urlArgs;
-    const currentState = states.at(-1)!;
+    const [selectedTurn, setSelectedTurn] = useState(turns.length);
+
+    if (selectedTurn > turns.length) {
+        // This may happen if props change. React will rerender immediately.
+        setSelectedTurn(turns.length);
+        return;
+    }
+
+    const currentState = states.at(selectedTurn)!;
 
     return (
         <div className="app">
@@ -442,7 +490,11 @@ export function ViewApp({urlArgs}: ViewAppProps) {
                         gameState={currentState}
                     />
                 </div>
-                <MoveList turns={turns} />
+                <MoveList
+                    turns={turns}
+                    selected={selectedTurn}
+                    onSelect={setSelectedTurn}
+                />
             </div>
         </div>
     );
@@ -459,7 +511,7 @@ export function MainApp() {
             setSource(e.target.value);
         }, []);
 
-    function handleSubmit(destination: 'edit'|'play') {
+    function handleSubmit(destination: 'edit'|'play'|'view') {
         let params = '';
         if (source === 'state-string') {
             const stateString = stateStringRef.current?.value ?? '';

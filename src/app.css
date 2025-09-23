@@ -73,12 +73,12 @@
     font-weight: normal;
 }
 
-.move-list tr:nth-child(odd) {
-    background: #e0e0e0;
-}
-
-.move-list tr:nth-child(even) {
-    background: #f0f0f0;
+.move-list tr:nth-child(odd)  { background: #e0e0e0; }
+.move-list tr:nth-child(even) { background: #f0f0f0; }
+.move-list tr.selectable:hover:nth-child(odd):not(.selected)  { background: #ffffc0; }
+.move-list tr.selectable:hover:nth-child(even):not(.selected) { background: #ffffe0; }
+.move-list tr.selectable {
+    cursor: pointer;
 }
 
 .move-list tr.redoable {
@@ -91,4 +91,8 @@
 
 .move-list tr.redoable:nth-child(even) {
     background: #303030;
+}
+
+.move-list tr.selected {
+    background: #ffff00;
 }
