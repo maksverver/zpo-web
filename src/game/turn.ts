@@ -1,128 +1,8 @@
-import { assertLength } from "./util";
-
-export const BOARD_WIDTH  =  8;
-export const BOARD_HEIGHT =  8;
-export const FIELD_COUNT  = 64;
-
-export const rowIds = 'abcdefgh';
-export const colIds = '12345678';
-
-export const Piece = Object.freeze({
-    WAZIR:   0,  // 0.1
-    KNIGHT:  1,  // 1.2
-    FERZ:    2,  // 1.1
-    DABBABA: 3,  // 0.2
-    ALFIL:   4,  // 2.2
-});
-
-export const pieceIds = [
-    'WNFDA',
-    'wnfda',
-];
-
-// Indices of fields where each player places their initial pieces.
-export const setupFields = Object.freeze([
-    Object.freeze([
-          0,  1,  2,  3,  4,  5,  6,  7,
-          8,  9, 10, 11, 12, 13, 14, 15,
-    ]),
-    Object.freeze([
-         48, 49, 50, 51, 52, 53, 54, 55,
-         56, 57, 58, 59, 60, 61, 62, 63,
-    ]),
-]);
-
-export type PieceType = typeof Piece[keyof typeof Piece];
-
-export const PIECE_COUNT = 5;
-
-// Number of pieces of each type each player starts with. (Note that a player
-// can have more than this number of pieces on the board thanks to captures and
-// drops.)
-export const initialPieceCounts = Object.freeze([1, 1, 2, 4, 8]);
-
-// Total number of pieces each player starts with.
-export const INITIAL_PIECE_COUNT = 16;
-
-// moveTables[piece][src] is an array of possible destinations
-export const moveTables = generateMoveTables();
-
-function generateMoveTables(): readonly(readonly (readonly number[])[])[] {
-    const res = [];
-    for (const [d1, d2] of [[0, 1], [1, 2], [1, 1], [0, 2], [2, 2]]) {
-        const pieceTable = [];
-        for (let r1 = 0; r1 < BOARD_HEIGHT; ++r1) {
-            for (let c1 = 0; c1 < BOARD_WIDTH; ++c1) {
-                const dests: number[] = [];
-                function addDest(r2: number, c2: number) {
-                    if ( 0 <= r2 && r2 < BOARD_HEIGHT &&
-                         0 <= c2 && c2 < BOARD_WIDTH ) {
-                        const j = BOARD_WIDTH*r2 + c2;
-                        if (!dests.includes(j)) {
-                            dests.push(j);
-                        }
-                    }
-                }
-                addDest(r1 - d1, c1 - d2);
-                addDest(r1 - d1, c1 + d2);
-                addDest(r1 + d1, c1 - d2);
-                addDest(r1 + d1, c1 + d2);
-                addDest(r1 - d2, c1 - d1);
-                addDest(r1 - d2, c1 + d1);
-                addDest(r1 + d2, c1 - d1);
-                addDest(r1 + d2, c1 + d1);
-                pieceTable.push(Object.freeze(dests));
-            }
-        }
-        res.push(Object.freeze(pieceTable));
-    }
-    return Object.freeze(res);
-}
-
-export type ColoredPiece = {
-    color: 0|1;
-    piece: PieceType;
-}
-
-export type GameState = {
-    // hand[color][piece] == number of pieces the player has on hand
-    hand: readonly (readonly number[])[],
-
-    // For each of 64 fields in row-major order, the piece on that field, if any.
-    board: readonly (null|ColoredPiece)[],
-
-    // 0-based turn index (aka number of turns played so far).
-    turn: number,
-}
-
-export const initialGameState: GameState = {
-    board: Object.freeze(Array(FIELD_COUNT).fill(null)),
-    hand:  Object.freeze(Array(2).fill(initialPieceCounts)),
-    turn:  0,
-};
-
-// Returns a bitmask of the colors of wazirs on the board.
-function getWazirs(board: readonly (null|ColoredPiece)[]): 0|1|2|3 {
-    let mask = 0;
-    for (const cp of board) {
-        if (cp != null && cp.piece == Piece.WAZIR) {
-            mask |= 1 << cp.color;
-            if (mask === 3) break;
-        }
-    }
-    return mask as (0|1|2|3);
-}
-
-export function isGameOver({turn, board}: GameState) {
-    return turn >= 2 && getWazirs(board) !== 3;
-}
-
-export function getWinner({board}: GameState): 0|1|null {
-    const mask = getWazirs(board);
-    if (mask === 1) return 0;
-    if (mask === 2) return 1;
-    return null;  // either 0 or 2 colors of wazirs left
-}
+import assertLength from "../util/assertLength";
+import { BOARD_WIDTH, colIds, rowIds } from "./board";
+import { executeSimpleMove, setupFields, type SimpleMove } from "./move";
+import { pieceIds, type PieceType } from "./piece";
+import { INITIAL_PIECE_COUNT, type ColoredPiece, type GameState } from "./state";
 
 export type SetupTurn = {
     type: 'setup',
@@ -153,15 +33,16 @@ function formatCoords(i: number) {
 
 export function formatTurn(turn: Turn): string {
     switch (turn.type) {
-        case 'setup':
+        case 'setup': {
             const ids = pieceIds[turn.color];
             return turn.pieces.map(piece => ids[piece]).join('');
-
-        case 'move':
+        }
+        case 'move': {
             return formatCoords(turn.src) + formatCoords(turn.dst);
-
-        case 'drop':
+        }
+        case 'drop': {
             return pieceIds[turn.color][turn.piece] + formatCoords(turn.dst);
+        }
     }
 }
 
@@ -178,9 +59,9 @@ export function parseTurn(s: string): null|Turn {
             return null;
         }
         const ids = pieceIds[color];
-        let pieces: PieceType[] = [];
-        for (let ch of s) {
-            let i = ids.indexOf(ch);
+        const pieces: PieceType[] = [];
+        for (const ch of s) {
+            const i = ids.indexOf(ch);
             if (i === -1) {
                 return null;
             }
@@ -308,39 +189,6 @@ export function parseTranscript(transcript: string): Turn[] {
         });
 }
 
-// The stuff below is more for the UI components than general game logic,
-// but I can't be arsed to separate it out at the moment.
-
-export type Selection = {
-    color: 0|1,
-    piece: PieceType
-    src: number,  // field index, or -1 for hand
-};
-
-export type SimpleMove = Selection & {
-    dst: number,  // field index, or -1 for hand
-};
-
-export function executeSimpleMove(gameState: GameState, move: SimpleMove): GameState {
-    const board = Array.from(gameState.board);
-    const hand = Array.from(gameState.hand, counts => Array.from(counts));
-    if (move.src === -1) {
-        --hand[move.color][move.piece];
-    } else {
-        board[move.src] = null;
-    }
-    if (move.dst === -1) {
-        ++hand[move.color][move.piece];
-    } else {
-        const old = board[move.dst];
-        if (old != null) {
-            ++hand[move.color][old.piece];
-        }
-        board[move.dst] = {color: move.color, piece: move.piece};
-    }
-    return {board, hand, turn: gameState.turn};
-}
-
 export function createSetupTurn(board: readonly (null|ColoredPiece)[], color: 0|1): SetupTurn {
     const pieces = assertLength(setupFields[color].map(field => {
         const cp = board[field];
@@ -363,8 +211,3 @@ export function createTurnFromSimpleMove(move: SimpleMove): MoveTurn|DropTurn {
         return {type: 'move', src, dst};
     }
 }
-
-export interface MoveGenerator {
-    generateSelectable: (gs: GameState) => readonly Selection[],
-    generateDestinations: (gs: GameState, sel: Selection) => readonly number[],
-};

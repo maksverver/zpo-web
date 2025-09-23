@@ -1,0 +1,17 @@
+.game-status {
+    padding: 8px 16px;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: center;
+    background: #eee;
+}
+
+.game-status .next-player {
+    text-align: center;
+}
+
+.game-status .code {
+    font: 12px monospace;
+}

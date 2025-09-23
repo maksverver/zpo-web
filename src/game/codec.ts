@@ -2,7 +2,9 @@
 //
 // See docs/encoding.txt in the main repo for technical details.
 
-import { FIELD_COUNT, Piece, PIECE_COUNT, type GameState } from "./game";
+import { FIELD_COUNT } from "./board";
+import { Piece, PIECE_COUNT } from "./piece";
+import type { GameState } from "./state";
 
 const base64Digits = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 

@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { type Selection, type ColoredPiece, type GameState, type MoveGenerator, type PieceType, type SimpleMove, rowIds, colIds } from './game';
 import './GameComponent.css';
+import type { ColoredPiece, GameState } from '../game/state';
+import { colIds, rowIds } from '../game/board';
+import type { PieceType } from '../game/piece';
+import type { MoveGenerator, Selection, SimpleMove } from '../game/move';
 
 const playerClassNames = Object.freeze(['red', 'blue']);
 const fieldColorNames = Object.freeze(['white', 'black']);
