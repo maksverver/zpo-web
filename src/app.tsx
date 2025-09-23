@@ -351,8 +351,8 @@ function reducePlayAppState(appState: PlayAppState, action: PlayAppAction): Play
             }
         }
         case 'redo-move': {
-            if (redoStack.length) {
-                const [nextTurn, nextState] = redoStack.at(-1);
+            if (redoStack.length > 0) {
+                const [nextTurn, nextState] = redoStack.at(-1)!;
                 return {
                     currentState: nextState,
                     turns: [...turns, nextTurn],
