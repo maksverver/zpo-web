@@ -79,6 +79,12 @@ function GameStatus({state, onChangeState, finishSetupEnabled, onFinishSetup}: G
     );
 }
 
+// Allows no moves.
+const noMoveGenerator: MoveGenerator = {
+    generateSelectable: () => [],
+    generateDestinations: () => [],
+};
+
 // Allows moving any piece anywhere. Useful for setting up arbitrary positions.
 const editMoveGenerator: MoveGenerator = {
     generateSelectable(gs: GameState): readonly Selection[] {
@@ -380,9 +386,7 @@ export function PlayApp({urlArgs}: PlayAppProps) {
     });
     const {currentState, turns, redoStack} = appState;
 
-    const handleMove = useCallback((move: SimpleMove) => {
-        dispatch({type: 'play-move', move});
-    }, []);
+    const handleMove = useCallback((move: SimpleMove) => dispatch({type: 'play-move', move}), []);
     const handleFinishSetup = useCallback(() => dispatch({type: 'finish-setup'}), []);
     const handleUndo = useCallback(() => dispatch({type: 'undo-move'}), []);
     const handleRedo = useCallback(() => dispatch({type: 'redo-move'}), []);
@@ -415,6 +419,30 @@ export function PlayApp({urlArgs}: PlayAppProps) {
                     onUndo={handleUndo}
                     onRedo={handleRedo}
                 />
+            </div>
+        </div>
+    );
+}
+
+type ViewAppProps = {
+    urlArgs: UrlArguments,
+};
+
+export function ViewApp({urlArgs}: ViewAppProps) {
+    const {states, turns} = urlArgs;
+    const currentState = states.at(-1)!;
+
+    return (
+        <div className="app">
+            <div className="game-with-move-list">
+                <div className="game-with-status">
+                    <GameStatus state={currentState} />
+                    <GameComponent
+                        moveGenerator={noMoveGenerator}
+                        gameState={currentState}
+                    />
+                </div>
+                <MoveList turns={turns} />
             </div>
         </div>
     );
@@ -540,6 +568,8 @@ export function MainApp() {
             </div>
             <hr/>
             <div>
+                <button name="destination" value="view" onClick={() => handleSubmit('view')}>View</button>
+                {' '}
                 <button name="destination" value="edit" onClick={() => handleSubmit('edit')}>Edit</button>
                 {' '}
                 <button name="destination" value="play" onClick={() => handleSubmit('play')}>Play</button>

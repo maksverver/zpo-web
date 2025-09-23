@@ -110,7 +110,7 @@ function Board({pieces, selectable, selected, onSelect}: BoardProps) {
 export type GameProps = {
     gameState: GameState;
     moveGenerator: MoveGenerator;
-    onMove: (move: SimpleMove) => void,
+    onMove?: (move: SimpleMove) => void,
 };
 
 export default function GameComponent(props: GameProps) {
@@ -124,7 +124,7 @@ export default function GameComponent(props: GameProps) {
             setSelection({color, piece, src: -1});
         } else if (selection.color === color && selection.piece === piece && selection.src !== -1) {
             // Execute move.
-            onMove({...selection, dst: -1});
+            onMove?.({...selection, dst: -1});
         } else {
             // Deselect.
             setSelection(undefined);
@@ -141,7 +141,7 @@ export default function GameComponent(props: GameProps) {
             }
         } else if (selection.src !== src) {
             // Execute move, then clear selection.
-            onMove({...selection, dst: src});
+            onMove?.({...selection, dst: src});
         } else {
             // Unselect.
             setSelection(undefined);
