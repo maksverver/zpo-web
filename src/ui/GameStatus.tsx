@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { decodeState, encodeState } from "../game/codec";
 import { getWinner, isGameOver, type GameState } from "../game/state";
 import './GameStatus.css';
@@ -11,7 +12,7 @@ export type GameStatusProps = {
     onFinishSetup?: () => void,
 };
 
-export default function GameStatus({state, onChangeState, finishSetupEnabled, onFinishSetup}: GameStatusProps) {
+const GameStatus = memo(({state, onChangeState, finishSetupEnabled, onFinishSetup}: GameStatusProps) => {
     const stateString = encodeState(state);
 
     function handleTurnClicked() {
@@ -74,4 +75,6 @@ export default function GameStatus({state, onChangeState, finishSetupEnabled, on
             }</div>
         </div>
     );
-}
+});
+
+export default GameStatus;

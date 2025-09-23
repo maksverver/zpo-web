@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { memo, useEffect } from "react";
 import { formatTurn, type Turn } from "../game/turn";
 import classNames from "../util/classNames";
 import './MoveList.css'
@@ -12,7 +12,7 @@ export type MoveListProps = {
     onSelect?: (i: number) => void;
 }
 
-export default function MoveList({turns, redoableTurns, selected, onUndo, onRedo, onSelect}: MoveListProps) {
+const MoveList = memo(({turns, redoableTurns, selected, onUndo, onRedo, onSelect}: MoveListProps) => {
     const canUndo = onUndo != null && turns.length > 0;
     const canRedo = onRedo != null && redoableTurns != null && redoableTurns.length > 0;
     const canPrev = onSelect != null && selected != null && selected >= 1;
@@ -126,4 +126,6 @@ export default function MoveList({turns, redoableTurns, selected, onUndo, onRedo
                 </div>}
         </div>
     );
-}
+});
+
+export default MoveList;

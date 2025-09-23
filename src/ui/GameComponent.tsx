@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import './GameComponent.css';
 import type { ColoredPiece, GameState } from '../game/state';
 import { colIds, rowIds } from '../game/board';
@@ -30,7 +30,7 @@ type FieldProps = {
     onSelect: () => void;
 };
 
-function Field({r, c, cp, selected, selectable, onSelect}: FieldProps) {
+const Field = memo(({r, c, cp, selected, selectable, onSelect}: FieldProps) => {
     let className = `field ${fieldColorNames[(r + c) % 2]} ${cp == null ? 'empty' : 'occupied'}`;
     if (selected) className += ' selected';
     if (selectable) className += ' selectable';
@@ -41,7 +41,7 @@ function Field({r, c, cp, selected, selectable, onSelect}: FieldProps) {
                 : <PieceComponent color={cp.color} piece={cp.piece} />}
         </div>
     );
-}
+});
 
 function PieceComponent({color, piece}: {color: 0|1, piece: PieceType}) {
     return (
@@ -59,7 +59,7 @@ type HandProps = {
     onSelect: (p: PieceType, c: 0|1) => void,
 };
 
-function Hand({color, pieceCounts, selectable: selectablePieces, selected, onSelect}: HandProps) {
+const Hand = memo(({color, pieceCounts, selectable: selectablePieces, selected, onSelect}: HandProps) => {
     return (
         <div className="hand">{
              pieceCounts.map((count, i) => {
@@ -79,7 +79,7 @@ function Hand({color, pieceCounts, selectable: selectablePieces, selected, onSel
             })
         }</div>
     )
-}
+});
 
 type BoardProps = {
     pieces: readonly (null|ColoredPiece)[];
@@ -88,7 +88,7 @@ type BoardProps = {
     onSelect: (i: number) => void;
 };
 
-function Board({pieces, selectable, selected, onSelect}: BoardProps) {
+const Board = memo(({pieces, selectable, selected, onSelect}: BoardProps) =>  {
     const fields = [];
     for (let r = 0; r < 8; ++r) {
         for (let c = 0; c < 8; ++c) {
@@ -108,7 +108,7 @@ function Board({pieces, selectable, selected, onSelect}: BoardProps) {
             {fields}
         </div>
     );
-}
+});
 
 export type GameProps = {
     gameState: GameState;
@@ -116,7 +116,7 @@ export type GameProps = {
     onMove?: (move: SimpleMove) => void,
 };
 
-export default function GameComponent(props: GameProps) {
+const GameComponent = memo((props: GameProps) => {
     const [selection, setSelection] = useState<undefined|Selection>();
     const {moveGenerator, gameState, onMove} = props;
     const {hand, board} = gameState;
@@ -211,4 +211,6 @@ export default function GameComponent(props: GameProps) {
             />
         </div>
     );
-}
+});
+
+export default GameComponent;
