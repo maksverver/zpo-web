@@ -1,16 +1,10 @@
 import { useState } from "react";
-import type { MoveGenerator } from "../game/move";
+import { noMoveGenerator } from "../game/move-generators";
 import type { UrlArguments } from "./UrlArguments";
 import GameStatus from "./GameStatus";
 import GameComponent from "./GameComponent";
 import MoveList from "./MoveList";
 import './page.css';
-
-// Allows no moves.
-const noMoveGenerator: MoveGenerator = {
-    generateSelectable: () => [],
-    generateDestinations: () => [],
-};
 
 export type ViewAppProps = {
     urlArgs: UrlArguments,

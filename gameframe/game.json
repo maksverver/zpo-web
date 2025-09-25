@@ -1,0 +1,22 @@
+{
+  "id": "zpo",
+  "name": "0·1 (Zero Point One)",
+  "version": [0, 0, 0],
+  "implementation": {
+    "game": {
+      "js": "game.js"
+    },
+    "controller": {
+      "html": "control.html"
+    }
+  },
+  "characteristics": {
+    "minPlayers": 2,
+    "maxPlayers": 2,
+    "durationMinutes": 30,
+    "minAge": 12
+  },
+  "card": {
+    "description": "A two player abstract strategy game combining elements of Chess and Shogi."
+  }
+}

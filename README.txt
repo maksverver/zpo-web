@@ -14,3 +14,11 @@ The app consists of four separate pages (which share common code):
     - play.html allows playing a game.
     - edit.html allows editing a game state (not subject to move restrictions)
     - view.html allows viewing a game transcript.
+
+## Experimental gameframe support ##
+
+Compile with:
+
+% npx esbuild --bundle src/gameframe/game.ts src/gameframe/control.tsx --minify --outdir=gameframe/
+
+This generates `gameframe/control.js`, `gameframe/game.js` and `gameframe/control.css`.

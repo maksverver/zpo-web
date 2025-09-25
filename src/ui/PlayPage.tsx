@@ -1,77 +1,13 @@
 import { useCallback, useMemo, useReducer } from "react";
-import { FIELD_COUNT } from "../game/board";
-import { executeSimpleMove, moveTables, setupFields, type MoveGenerator, type Selection, type SimpleMove } from "../game/move";
-import { isGameOver, type GameState } from "../game/state";
+import { executeSimpleMove, setupFields, type SimpleMove } from "../game/move";
+import { playMoveGenerator } from "../game/move-generators";
+import { type GameState } from "../game/state";
 import { createSetupTurn, createTurnFromSimpleMove, endTurn, type Turn } from "../game/turn";
-import type { PieceType } from "../game/piece";
 import GameStatus from "./GameStatus";
 import GameComponent from "./GameComponent";
 import MoveList from "./MoveList";
 import type { UrlArguments } from "./UrlArguments";
 import './page.css';
-
-// Allows only valid moves.
-const playMoveGenerator: MoveGenerator = {
-    generateSelectable(gs: GameState): readonly Selection[] {
-        const res: Selection[] = [];
-        if (!isGameOver(gs)) {
-            const p = gs.turn % 2;
-            // Player can always drop a piece in hand.
-            gs.hand[p].forEach((n, i) => {
-                if (n > 0) {
-                    const color = p as 0|1;
-                    const piece = i as PieceType;
-                    res.push({color, piece, src: -1});
-                }
-            });
-            // Or move any of their pieces on the board.
-            gs.board.forEach((cp, src) => {
-                if (cp != null && cp.color === p) {
-                    const {color, piece} = cp;
-                    res.push({color, piece, src});
-                }
-            });
-        }
-        return res;
-    },
-
-    generateDestinations(gs: GameState, sel: Selection): readonly number[] {
-        const res: number[] = [];
-        if (!isGameOver(gs)) {
-            const p = gs.turn % 2;
-            if (gs.turn < 2) {
-                // Setup mode.
-                if (sel.src !== -1) {
-                    res.push(-1);  // take back piece on board
-                }
-                for (const i of setupFields[p]) {
-                    if (sel.src !== i) {
-                        res.push(i);  // move/drop piece on board
-                    }
-                }
-            } else {
-                // Move mode.
-                if (sel.src === -1) {
-                    // Move from hand to any empty field.
-                    for (let dst = 0; dst < FIELD_COUNT; ++dst) {
-                        if (gs.board[dst] == null) {
-                            res.push(dst);
-                        }
-                    }
-                } else {
-                    // Move from board to an adjacent field that is either empty,
-                    // or occupied by the opponent (which leas to a capture).
-                    for (const dst of moveTables[sel.piece][sel.src]) {
-                        if (gs.board[dst]?.color !== sel.color) {
-                            res.push(dst);
-                        }
-                    }
-                }
-            }
-        }
-        return res;
-    },
-};
 
 type PlayAppState = {
     currentState: GameState,

@@ -1,8 +1,8 @@
 import assertLength from "../util/assertLength";
 import { BOARD_WIDTH, colIds, rowIds } from "./board";
-import { executeSimpleMove, setupFields, type SimpleMove } from "./move";
+import { executeSimpleMove, moveTables, setupFields, type SimpleMove } from "./move";
 import { pieceIds, type PieceType } from "./piece";
-import { INITIAL_PIECE_COUNT, type ColoredPiece, type GameState } from "./state";
+import { INITIAL_PIECE_COUNT, initialPieceCounts, type ColoredPiece, type GameState } from "./state";
 
 export type SetupTurn = {
     type: 'setup',
@@ -209,5 +209,35 @@ export function createTurnFromSimpleMove(move: SimpleMove): MoveTurn|DropTurn {
         return {type: 'drop', color, piece, dst};
     } else {
         return {type: 'move', src, dst};
+    }
+}
+
+function validatePieceCounts(pieces: PieceType[]): boolean {
+    const counts = Array.from(initialPieceCounts);
+    for (const p of pieces) --counts[p];
+    return counts.every(n => n === 0);
+}
+
+export function validateTurn(state: GameState, turn: Turn): boolean {
+    switch (turn.type) {
+        case 'setup': {
+            return state.turn < 2 && turn.color === state.turn && validatePieceCounts(turn.pieces);
+        }
+
+        case 'move': {
+            let srcPiece: ColoredPiece | null;
+            let dstPiece: ColoredPiece | null;
+            return state.turn >= 2 &&
+                ((srcPiece = state.board[turn.src]) != null && srcPiece.color === state.turn % 2) &&
+                ((dstPiece = state.board[turn.dst]) == null || dstPiece.color !== state.turn % 2) &&
+                (moveTables[srcPiece.piece][turn.src].includes(turn.dst));
+        }
+
+        case 'drop': {
+            return state.turn >= 2 &&
+                turn.color === state.turn % 2 &&
+                state.hand[turn.color][turn.piece] > 0 &&
+                state.board[turn.dst] == null;
+        }
     }
 }
