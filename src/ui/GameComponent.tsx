@@ -117,7 +117,7 @@ export type GameProps = {
 };
 
 const GameComponent = memo((props: GameProps) => {
-    const [selection, setSelection] = useState<undefined|Selection>();
+    const [selection, setSelection] = useState<null|Selection>();
     const {moveGenerator, gameState, onMove} = props;
     const {hand, board} = gameState;
 
@@ -130,7 +130,7 @@ const GameComponent = memo((props: GameProps) => {
             onMove?.({...selection, dst: -1});
         } else {
             // Deselect.
-            setSelection(undefined);
+            setSelection(null);
         }
     }, [selection, onMove]);
 
@@ -143,18 +143,13 @@ const GameComponent = memo((props: GameProps) => {
                 setSelection({color, piece, src});
             }
         } else if (selection.src !== src) {
-            // Execute move, then clear selection.
+            // Execute move. (Changing the game state will clear the selection.)
             onMove?.({...selection, dst: src});
         } else {
             // Unselect.
-            setSelection(undefined);
+            setSelection(null);
         }
     }, [selection, gameState, onMove]);
-
-    // Clear the selection whenever the game state changes. (I could do
-    // something smarter here, like verify whether the selection is still valid,
-    // but I don't think it's important enough to bother.)
-    useEffect(() => setSelection(undefined), [gameState, moveGenerator]);
 
     const selectable = useMemo(
         () => {
@@ -186,6 +181,25 @@ const GameComponent = memo((props: GameProps) => {
             return {inHand, onBoard};
         },
         [moveGenerator, gameState, selection]);
+
+    // Clear the selection whenever the game state changes.
+    useEffect(() => {
+        // If there is no active selection, nothing needs to be done.
+        if (selection == null) return;
+
+        // Keep selection if it's still valid; this helps put down multiple
+        // pieces of the same type quickly during setup.
+        for (const {color, piece, src} of moveGenerator.generateSelectable(gameState)) {
+            if ( color === selection.color &&
+                 piece === selection.piece &&
+                 src   === selection.src ) {
+                return;
+            }
+        }
+
+        // Otherwise, clear the selection.
+        setSelection(null);
+    }, [gameState, moveGenerator]);
 
     return (
         <div className="game">
