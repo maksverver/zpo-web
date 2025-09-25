@@ -6,7 +6,7 @@ To build/run:
 
 % npm install
 % npm run dev    # starts development server
-% npm build      # builds static files
+% npm run build  # builds static files in dist/ and gameframe/
 
 The app consists of four separate pages (which share common code):
 
@@ -14,6 +14,7 @@ The app consists of four separate pages (which share common code):
     - play.html allows playing a game.
     - edit.html allows editing a game state (not subject to move restrictions)
     - view.html allows viewing a game transcript.
+
 
 ## Experimental gameframe support ##
 

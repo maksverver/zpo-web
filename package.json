@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && esbuild --bundle src/gameframe/game.ts src/gameframe/control.tsx --minify --outdir=gameframe/",
     "lint": "eslint .",
     "preview": "vite preview"
   },
