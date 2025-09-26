@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import './GameComponent.css';
 import type { ColoredPiece, GameState } from '../game/state';
-import { colIds, rowIds } from '../game/board';
+import { BOARD_WIDTH, colIds, rowIds } from '../game/board';
 import type { PieceType } from '../game/piece';
 import type { MoveGenerator, Selection, SimpleMove } from '../game/move';
 
@@ -21,42 +21,75 @@ const pieceNames = Object.freeze([
     'Alfil (2.2)',
 ]);
 
-type FieldProps = {
-    r: number;
-    c: number;
-    cp?: ColoredPiece;
-    selected: boolean;
-    selectable: boolean;
-    onSelect: () => void;
-};
+type PieceProps = {
+    color: 0|1;
+    piece: PieceType;
+    lastMove?: SimpleMove;
+}
 
-const Field = memo(({r, c, cp, selected, selectable, onSelect}: FieldProps) => {
-    let className = `field ${fieldColorNames[(r + c) % 2]} ${cp == null ? 'empty' : 'occupied'}`;
-    if (selected) className += ' selected';
-    if (selectable) className += ' selectable';
-    return (
-        <div className={className} onClick={selectable ? onSelect : undefined}>
-            {cp == null
-                ? <div className='label'>{rowIds[r] + colIds[c]}</div>
-                : <PieceComponent color={cp.color} piece={cp.piece} />}
-        </div>
-    );
-});
+function PieceComponent({color, piece, lastMove}: PieceProps) {
+    let className = `piece ${playerClassNames[color]}`;
+    let style = undefined;
+    if (lastMove != null) {
+        className += ' moving';
+        if (lastMove.src == -1) {
+            style = {animationName: `piece-drop`};
+        } else {
+            const c1 = lastMove.src % BOARD_WIDTH;
+            const r1 = (lastMove.src - c1) / BOARD_WIDTH;
+            const c2 = lastMove.dst % BOARD_WIDTH;
+            const r2 = (lastMove.dst - c2) / BOARD_WIDTH;
+            const dr = r2 - r1;
+            const dc = c2 - c1;
+            style = {animationName: `piece-move-${-dc}-${-dr}`};
+        }
+    }
 
-function PieceComponent({color, piece}: {color: 0|1, piece: PieceType}) {
     return (
-        <div className={`piece ${playerClassNames[color]}`} title={pieceNames[piece]}>
+        <div
+            className={className}
+            title={pieceNames[piece]}
+            style={style}
+        >
             {pieceEmoji[color][piece]}
         </div>
     );
 }
 
+type FieldProps = {
+    r: number;
+    c: number;
+    cp?: ColoredPiece;
+    lastMove?: SimpleMove;
+    selected: boolean;
+    selectable: boolean;
+    onSelect: () => void;
+};
+
+const Field = memo(({r, c, cp, lastMove, selected, selectable, onSelect}: FieldProps) => {
+    const i = BOARD_WIDTH*r + c;
+    let className = `field ${fieldColorNames[(r + c) % 2]} ${cp == null ? 'empty' : 'occupied'}`;
+    if (selected) className += ' selected';
+    if (selectable) className += ' selectable';
+    if (lastMove != null) {
+        if (i === lastMove.src) className += ' moved-from';
+        if (i === lastMove.dst) className += ' moved-to';
+    }
+    return (
+        <div className={className} onClick={selectable ? onSelect : undefined}>
+            {cp == null
+                ? <div className='label'>{rowIds[r] + colIds[c]}</div>
+                : <PieceComponent color={cp.color} piece={cp.piece} lastMove={i === lastMove?.dst ? lastMove : undefined} />}
+        </div>
+    );
+});
+
 type HandProps = {
-    color: 0|1,
-    pieceCounts: readonly number[],  // piece type -> number available
-    selected?: PieceType,
-    selectable: Set<PieceType>,
-    onSelect: (p: PieceType, c: 0|1) => void,
+    color: 0|1;
+    pieceCounts: readonly number[];  // piece type -> number available
+    selected?: PieceType;
+    selectable: Set<PieceType>;
+    onSelect: (p: PieceType, c: 0|1) => void;
 };
 
 const Hand = memo(({color, pieceCounts, selectable: selectablePieces, selected, onSelect}: HandProps) => {
@@ -83,12 +116,13 @@ const Hand = memo(({color, pieceCounts, selectable: selectablePieces, selected, 
 
 type BoardProps = {
     pieces: readonly (null|ColoredPiece)[];
+    lastMove?: SimpleMove;
     selectable: Set<number>;
-    selected: number,
+    selected: number;
     onSelect: (i: number) => void;
 };
 
-const Board = memo(({pieces, selectable, selected, onSelect}: BoardProps) =>  {
+const Board = memo(({pieces, lastMove, selectable, selected, onSelect}: BoardProps) =>  {
     const fields = [];
     for (let r = 0; r < 8; ++r) {
         for (let c = 0; c < 8; ++c) {
@@ -96,6 +130,7 @@ const Board = memo(({pieces, selectable, selected, onSelect}: BoardProps) =>  {
             const cp = pieces[i];
             fields.push(
                 <Field r={r} c={c} key={i}
+                    lastMove={lastMove}
                     selected={selected === i}
                     selectable={selectable.has(i)}
                     onSelect={() => onSelect(i)}
@@ -112,13 +147,14 @@ const Board = memo(({pieces, selectable, selected, onSelect}: BoardProps) =>  {
 
 export type GameProps = {
     gameState: GameState;
+    lastMove?: SimpleMove,
     moveGenerator: MoveGenerator;
     onMove?: (move: SimpleMove) => void,
 };
 
 const GameComponent = memo((props: GameProps) => {
     const [selection, setSelection] = useState<null|Selection>();
-    const {moveGenerator, gameState, onMove} = props;
+    const {gameState, lastMove, moveGenerator, onMove} = props;
     const {hand, board} = gameState;
 
     const selectInHand = useCallback((piece: PieceType, color: 0|1) => {
@@ -212,6 +248,7 @@ const GameComponent = memo((props: GameProps) => {
             />
             <Board
                 pieces={board}
+                lastMove={lastMove}
                 selected={selection?.src || -1}
                 selectable={selectable.onBoard}
                 onSelect={selectOnBoard}

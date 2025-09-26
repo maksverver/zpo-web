@@ -2,7 +2,7 @@ import React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client'
 import { initialGameState, isGameOver, type GameState } from '../game/state';
-import { createSetupTurn, createTurnFromSimpleMove, formatTurn, parseTurn, type Turn } from '../game/turn';
+import { createSetupTurn, createTurnFromSimpleMove, formatTurn, parseTurn, turnToSimpleMoves, type Turn } from '../game/turn';
 import { noMoveGenerator, playMoveGenerator } from '../game/move-generators';
 import { executeSimpleMove, setupFields, type SimpleMove } from '../game/move';
 import GameComponent from '../ui/GameComponent';
@@ -73,6 +73,7 @@ window.addEventListener('message', (event: MessageEvent) => {
 type AppState = {
     players: number,  // bitmask
     gameState: GameState,
+    previousState: GameState|null,
     lastMove: Turn|null,
 }
 
@@ -87,6 +88,7 @@ function modeToAppState(mode: MoveMode): AppState {
     return {
         players,
         gameState: mode.state,
+        previousState: mode.previousState || null,
         lastMove: mode.lastMove == null ? null : parseTurn(mode.lastMove),
     };
 }
@@ -100,8 +102,8 @@ function sendTurn(color: 0|1, turn: Turn) {
 }
 
 function App() {
-    const [state, setState] = useState<AppState>({players: 0, gameState: initialGameState, lastMove: null});
-    const {players, gameState, lastMove} = state;
+    const [state, setState] = useState<AppState>({players: 0, gameState: initialGameState, previousState: null, lastMove: null});
+    const {players, gameState, previousState, lastMove} = state;
     const nextPlayer = gameState.turn % 2 as 0|1;
 
     useEffect(() => {
@@ -133,6 +135,14 @@ function App() {
             ? setupFields[gameState.turn % 2].every(i => gameState.board[i] != null)
             : undefined;
 
+    let lastSimpleMove = undefined;
+    if (previousState != null && lastMove != null) {
+        const simpleMoves = turnToSimpleMoves(previousState, lastMove);
+        if (simpleMoves.length === 1) {
+            lastSimpleMove = simpleMoves[0];
+        }
+    }
+
     return (
         <div className="page">
             <div className="game-with-status">
@@ -145,6 +155,7 @@ function App() {
                     moveGenerator={moveEnabled ? playMoveGenerator : noMoveGenerator}
                     gameState={gameState}
                     onMove={handleMove}
+                    lastMove={lastSimpleMove}
                 />
             </div>
         </div>

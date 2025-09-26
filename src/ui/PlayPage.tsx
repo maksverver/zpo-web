@@ -2,7 +2,7 @@ import { useCallback, useMemo, useReducer } from "react";
 import { executeSimpleMove, setupFields, type SimpleMove } from "../game/move";
 import { playMoveGenerator } from "../game/move-generators";
 import { type GameState } from "../game/state";
-import { createSetupTurn, createTurnFromSimpleMove, endTurn, type Turn } from "../game/turn";
+import { createSetupTurn, createTurnFromSimpleMove, endTurn, turnToSimpleMoves, type Turn } from "../game/turn";
 import GameStatus from "./GameStatus";
 import GameComponent from "./GameComponent";
 import MoveList from "./MoveList";
@@ -98,7 +98,7 @@ export default function PlayPage({urlArgs}: PlayAppProps) {
         turns: urlArgs.turns,
         redoStack: [],
     });
-    const {currentState, turns, redoStack} = appState;
+    const {currentState, states, turns, redoStack} = appState;
 
     const handleMove = useCallback((move: SimpleMove) => dispatch({type: 'play-move', move}), []);
     const handleFinishSetup = useCallback(() => dispatch({type: 'finish-setup'}), []);
@@ -112,6 +112,16 @@ export default function PlayPage({urlArgs}: PlayAppProps) {
             ? setupFields[currentState.turn % 2].every(i => currentState.board[i] != null)
             : undefined;
 
+    const lastMove = useMemo(() => {
+        const lastTurn = turns.at(-1);
+        if (lastTurn == null) return undefined;
+        const prevState = states.at(-2);
+        if (prevState == null) return undefined;
+        const simpleMoves = turnToSimpleMoves(prevState, lastTurn);
+        if (simpleMoves.length !== 1) return undefined;
+        return simpleMoves[0];
+    }, [states, turns]);
+
     return (
         <div className="page">
             <div className="game-with-move-list">
@@ -122,8 +132,9 @@ export default function PlayPage({urlArgs}: PlayAppProps) {
                         onFinishSetup={handleFinishSetup}
                     />
                     <GameComponent
-                        moveGenerator={playMoveGenerator}
                         gameState={currentState}
+                        lastMove={lastMove}
+                        moveGenerator={playMoveGenerator}
                         onMove={handleMove}
                     />
                 </div>

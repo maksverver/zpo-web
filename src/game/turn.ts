@@ -116,44 +116,49 @@ export function endTurn(gameState: GameState): GameState {
     return {...gameState, turn: gameState.turn + 1};
 }
 
-// Executes a turn, if possible. It doesn't check if the turn is legal.
-// If the turn is definitely illegal an exception may be thrown.
-export function executeTurn(gameState: GameState, turn: Turn): GameState {
+export function turnToSimpleMoves(state: GameState, turn: Turn): SimpleMove[] {
     switch (turn.type) {
         case 'setup': {
             const {color} = turn;
-            return endTurn(
-                turn.pieces.reduce(
-                    (state, piece, i) => {
-                        const dst = setupFields[color][i];
-                        if (state.hand[color][piece] === 0) {
-                            throw new Error('Illegal setup turn: piece is not on hand!');
-                        }
-                        if (state.board[dst] != null) {
-                            throw new Error('Illegal setup turn: destination field is not empty!');
-                        }
-                        return executeSimpleMove(state, {color, piece, src: -1, dst});
-                    }, gameState));
+            return turn.pieces.map((piece, i) => {
+                const dst = setupFields[color][i];
+                if (state.hand[color][piece] === 0) {
+                    throw new Error('Illegal setup turn: piece is not on hand!');
+                }
+                if (state.board[dst] != null) {
+                    throw new Error('Illegal setup turn: destination field is not empty!');
+                }
+                return {color, piece, src: -1, dst};
+            });
         }
 
         case 'move': {
             const {src, dst} = turn;
-            const cp = gameState.board[src];
+            const cp = state.board[src];
             if (cp == null) {
                 throw new Error(`Illegal move turn: source field is empty!`);
             }
             const {color, piece} = cp;
-            return endTurn(executeSimpleMove(gameState, {color, piece, src, dst}));
+            return [{color, piece, src, dst}];
         }
 
         case 'drop': {
             const {color, piece, dst} = turn;
-            if (gameState.hand[color][piece] === 0) {
+            if (state.hand[color][piece] === 0) {
                 throw new Error('Illegal drop turn: piece is not on hand!');
             }
-            return endTurn(executeSimpleMove(gameState, {color, piece, src: -1, dst}));
+            return [{color, piece, src: -1, dst}];
         }
     }
+}
+
+// Executes a turn, if possible. It doesn't check if the turn is legal.
+// If the turn is definitely illegal an exception may be thrown.
+export function executeTurn(gameState: GameState, turn: Turn): GameState {
+    for (const simpleMove of turnToSimpleMoves(gameState, turn)) {
+        gameState = executeSimpleMove(gameState, simpleMove);
+    }
+    return endTurn(gameState);
 }
 
 // Decodes a transcript into an array of turns.

@@ -18,8 +18,10 @@ The app consists of four separate pages (which share common code):
 
 ## Experimental gameframe support ##
 
-Compile with:
+Manually compile with:
 
-% npx esbuild --bundle src/gameframe/game.ts src/gameframe/control.tsx --minify --outdir=gameframe/
+% npx esbuild --bundle src/gameframe/game.ts src/gameframe/control.tsx --outdir=gameframe/
+
+(or add --minify to generate minified output.)
 
 This generates `gameframe/control.js`, `gameframe/game.js` and `gameframe/control.css`.
