@@ -19,7 +19,7 @@
     display: grid;
     align-items: center;
     justify-content: center;
-    transition: background-color 0.5s, box-shadow 0.5s;
+    transition: background-color 0.5ms;
 }
 
 .field.white { background: #fff0e0 }
@@ -53,12 +53,12 @@
 }
 
 .field.moved-from:not(.selectable) .label {
-    border: 3px dotted rgba(1, 1, 0, 0.25);
+    border: 3px dotted rgba(0, 0, 0, 0.25);
     border-radius: 40px;
 }
 
-.field.moved-to:not(.selectable) {
-    box-shadow: inset 0 0 0 6px rgba(0, 0, 0, 0.50);
+.field.moved-to .piece {
+    outline: 3px solid rgba(0, 0, 0, 0.75);
 }
 
 .hand {
