@@ -235,7 +235,7 @@ const GameComponent = memo((props: GameProps) => {
 
         // Otherwise, clear the selection.
         setSelection(null);
-    }, [gameState, moveGenerator]);
+    }, [gameState, moveGenerator, selection]);
 
     return (
         <div className="game">

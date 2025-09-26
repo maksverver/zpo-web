@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { noMoveGenerator } from "../game/move-generators";
 import type { UrlArguments } from "./UrlArguments";
 import GameStatus from "./GameStatus";
@@ -21,17 +21,18 @@ export default function ViewPage({urlArgs}: ViewAppProps) {
         return;
     }
 
-    const currentState = states.at(selectedTurn)!;
-
-    const lastMove = useMemo(() => {
-        if (selectedTurn === 0) return undefined;
-        const prevState = states.at(selectedTurn - 1);
-        const lastTurn = turns.at(selectedTurn - 1);
-        if (prevState == null || lastTurn == null) return undefined;
+    function getLastMove() {
+        if (selectedTurn === 0 || selectedTurn > turns.length) {
+            return undefined;
+        }
+        const prevState = states[selectedTurn - 1];
+        const lastTurn = turns[selectedTurn - 1];
         const simpleMoves = turnToSimpleMoves(prevState, lastTurn);
         if (simpleMoves.length !== 1) return undefined;
         return simpleMoves[0];
-    }, [states, turns, selectedTurn]);
+    }
+
+    const currentState = states.at(selectedTurn)!;
 
     return (
         <div className="page">
@@ -40,7 +41,7 @@ export default function ViewPage({urlArgs}: ViewAppProps) {
                     <GameStatus state={currentState} />
                     <GameComponent
                         gameState={currentState}
-                        lastMove={lastMove}
+                        lastMove={getLastMove()}
                         moveGenerator={noMoveGenerator}
                     />
                 </div>

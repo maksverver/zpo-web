@@ -10,19 +10,19 @@ import {executeTurn, formatTurn, parseTurn, validateTurn} from  '../game/turn';
 
 export const playerIds = Object.freeze(['red', 'blue']);
 
-function setUp(parameters: unknown) {
+function setUp(parameters: unknown): GameState|null {
     return parameters == null ? initialGameState : null;
 }
 
-function getAllPlayers(_state: GameState) {
+function getAllPlayers(_state: GameState): readonly string[] {
     return playerIds;
 }
 
-function getActivePlayers(state: GameState) {
+function getActivePlayers(state: GameState): readonly string[] {
     return isGameOver(state) ? [] : [playerIds[state.turn % 2]];
 }
 
-function validateMove(state: GameState, player: string, move: string) {
+function validateMove(state: GameState, player: string, move: string): string|null {
     let turn;
     return (player === playerIds[state.turn % 2] &&
             typeof move === 'string' &&
@@ -30,7 +30,7 @@ function validateMove(state: GameState, player: string, move: string) {
             validateTurn(state, turn)) ? formatTurn(turn) : null;
 }
 
-function executeMove(state: GameState, _player: string, move: string) {
+function executeMove(state: GameState, _player: string, move: string): GameState {
     return executeTurn(state, parseTurn(move)!);
 }
 
@@ -45,5 +45,6 @@ function getScores(state: GameState) {
     }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).GAME = {
     setUp, getAllPlayers, getActivePlayers, validateMove, executeMove, getScores };

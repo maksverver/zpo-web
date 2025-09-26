@@ -101,7 +101,7 @@ function sendTurn(color: 0|1, turn: Turn) {
     }, "*");
 }
 
-function App() {
+export function App() {
     const [state, setState] = useState<AppState>({players: 0, gameState: initialGameState, previousState: null, lastMove: null});
     const {players, gameState, previousState, lastMove} = state;
     const nextPlayer = gameState.turn % 2 as 0|1;
