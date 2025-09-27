@@ -9,8 +9,8 @@ const playerClassNames = Object.freeze(['red', 'blue']);
 const fieldColorNames = Object.freeze(['white', 'black']);
 
 const pieceEmoji = Object.freeze([
-    Object.freeze(['♔', '♘', '♗', '♖', '♙']),
-    Object.freeze(['♚', '♞', '♝', '♜', '♟']),
+    Object.freeze(['♔', '♘', '♙', '♖', '♗']),
+    Object.freeze(['♚', '♞', '♟', '♜', '♝']),
 ]);
 
 const pieceNames = Object.freeze([
