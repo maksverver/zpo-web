@@ -1,14 +1,15 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client'
-import { initialGameState, isGameOver, type GameState } from '../game/state';
+import { isGameOver } from '../game/state';
 import { createSetupTurn, createTurnFromSimpleMove, formatTurn, parseTurn, turnToSimpleMoves, type Turn } from '../game/turn';
 import { noMoveGenerator, playMoveGenerator } from '../game/move-generators';
 import { executeSimpleMove, setupFields, type SimpleMove } from '../game/move';
 import GameComponent from '../ui/GameComponent';
 import '../ui/page.css';
 import GameStatus from '../ui/GameStatus';
-import { playerIds } from './game';
+import { initialState, playerIds, type FullState } from './game';
+import MoveList from '../ui/MoveList';
 
 // Hack to prevent error: "Uncaught ReferenceError: React is not defined".
 // I haven't really figured out why this happens; it seems to have something to
@@ -18,8 +19,8 @@ globalThis.React = React;
 
 type MoveMode = {
     players: ('red'|'blue')[],
-    state: GameState,
-    previousState?: GameState,
+    state: FullState,
+    previousState?: FullState,
     lastPlayer?: ('red'|'blue'),
     lastMove?: string,
 };
@@ -31,7 +32,7 @@ class ModeTracker extends EventTarget {
         super();
         this.currentMode = {
             players: [],
-            state: initialGameState,
+            state: initialState,
         };
     }
 
@@ -72,8 +73,8 @@ window.addEventListener('message', (event: MessageEvent) => {
 
 type AppState = {
     players: number,  // bitmask
-    gameState: GameState,
-    previousState: GameState|null,
+    gameState: FullState,
+    previousState: FullState|null,
     lastMove: Turn|null,
 }
 
@@ -102,7 +103,12 @@ function sendTurn(color: 0|1, turn: Turn) {
 }
 
 export function App() {
-    const [state, setState] = useState<AppState>({players: 0, gameState: initialGameState, previousState: null, lastMove: null});
+    const [state, setState] = useState<AppState>({
+        players:       0,
+        gameState:     initialState,
+        previousState: null,
+        lastMove:      null,
+    });
     const {players, gameState, previousState, lastMove} = state;
     const nextPlayer = gameState.turn % 2 as 0|1;
 
@@ -117,8 +123,13 @@ export function App() {
 
     const handleMove = useCallback((move: SimpleMove) => {
         if (gameState.turn < 2) {
-            setState((appState: AppState) =>
-                ({...appState, gameState: executeSimpleMove(appState.gameState, move)}));
+            setState((appState: AppState) => ({
+                ...appState,
+                gameState: {
+                    ...executeSimpleMove(appState.gameState, move),
+                    history: appState.gameState.history,
+                },
+            }));
         } else {
             sendTurn(nextPlayer, createTurnFromSimpleMove(move));
         }
@@ -127,6 +138,10 @@ export function App() {
     const handleFinishSetup = useCallback(() => {
         sendTurn(nextPlayer, createSetupTurn(gameState.board, nextPlayer));
     }, [gameState.board, nextPlayer]);
+
+    const turns: readonly Turn[] = useMemo(
+        () => gameState.history.map(s => parseTurn(s)!),
+        [gameState]);
 
     const moveEnabled = !isGameOver(gameState) && (players & (1 << nextPlayer)) !== 0;
 
@@ -145,18 +160,21 @@ export function App() {
 
     return (
         <div className="page">
-            <div className="game-with-status">
-                <GameStatus
-                    state={gameState}
-                    finishSetupEnabled={finishSetupEnabled}
-                    onFinishSetup={handleFinishSetup}
-                />
-                <GameComponent
-                    moveGenerator={moveEnabled ? playMoveGenerator : noMoveGenerator}
-                    gameState={gameState}
-                    onMove={handleMove}
-                    lastMove={lastSimpleMove}
-                />
+            <div className="game-with-move-list">
+                <div className="game-with-status">
+                    <GameStatus
+                        state={gameState}
+                        finishSetupEnabled={finishSetupEnabled}
+                        onFinishSetup={handleFinishSetup}
+                    />
+                    <GameComponent
+                        moveGenerator={moveEnabled ? playMoveGenerator : noMoveGenerator}
+                        gameState={gameState}
+                        onMove={handleMove}
+                        lastMove={lastSimpleMove}
+                    />
+                </div>
+                <MoveList turns={turns} />
             </div>
         </div>
     );

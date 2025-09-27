@@ -8,21 +8,24 @@
 import {initialGameState, isGameOver, getWinner, type GameState} from  '../game/state';
 import {executeTurn, formatTurn, parseTurn, validateTurn} from  '../game/turn';
 
+export type FullState = GameState & {history: readonly string[]}
+
+export const initialState: FullState = {...initialGameState, history: Object.freeze([])};
 export const playerIds = Object.freeze(['red', 'blue']);
 
-function setUp(parameters: unknown): GameState|null {
-    return parameters == null ? initialGameState : null;
+function setUp(parameters: unknown): FullState|null {
+    return parameters == null ? initialState : null;
 }
 
-function getAllPlayers(_state: GameState): readonly string[] {
+function getAllPlayers(_state: FullState): readonly string[] {
     return playerIds;
 }
 
-function getActivePlayers(state: GameState): readonly string[] {
+function getActivePlayers(state: FullState): readonly string[] {
     return isGameOver(state) ? [] : [playerIds[state.turn % 2]];
 }
 
-function validateMove(state: GameState, player: string, move: string): string|null {
+function validateMove(state: FullState, player: string, move: string): string|null {
     let turn;
     return (player === playerIds[state.turn % 2] &&
             typeof move === 'string' &&
@@ -30,11 +33,13 @@ function validateMove(state: GameState, player: string, move: string): string|nu
             validateTurn(state, turn)) ? formatTurn(turn) : null;
 }
 
-function executeMove(state: GameState, _player: string, move: string): GameState {
-    return executeTurn(state, parseTurn(move)!);
+function executeMove(state: FullState, _player: string, move: string): FullState {
+    return {
+        ...executeTurn(state, parseTurn(move)!),
+        history: [...state.history, move]}
 }
 
-function getScores(state: GameState) {
+function getScores(state: FullState) {
     if (!isGameOver(state)) {
         return {};
     }
