@@ -74,13 +74,19 @@ const MoveList = memo(({turns, redoableTurns, selected, onUndo, onRedo, onSelect
                 </div>
             }
             <table>
-                <tbody>
+                <thead>
                     <tr className={classNames({
                             selectable: onSelect != null,
                             selected: selected === 0,
                         })}
                         onClick={onSelect == null ? undefined : () => onSelect(0)}
-                    ><th>0.</th><td colSpan={2} align="center">Start</td></tr>
+                    >
+                        <td></td>
+                        <th>Red</th>
+                        <th>Blue</th>
+                    </tr>
+                </thead>
+                <tbody>
                     {
                         turns.map((turn, i) => {
                             const j = i + 1;
