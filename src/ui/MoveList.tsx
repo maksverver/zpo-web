@@ -1,7 +1,67 @@
 import React, { memo, useEffect } from "react";
-import { formatTurn, type Turn } from "../game/turn";
+import { executeTurn, formatTurn, type Turn } from "../game/turn";
 import classNames from "../util/classNames";
 import './MoveList.css'
+import { initialGameState } from "../game/state";
+import { encodeState } from "../game/codec";
+
+function formatFancyTurn(turn: Turn) {
+    const s = formatTurn(turn);
+    if (s.length <= 8) {
+        return s;
+    }
+    return <React.Fragment>{s.substring(0,8)}<br/>{s.substring(8)}</React.Fragment>
+}
+
+type TurnProps = {
+    idx: number;
+    turns: readonly Turn[];
+    redoable: boolean;
+    selected: boolean;
+    onSelect?: () => void;
+}
+
+function Turn({idx, turns, redoable, selected, onSelect}: TurnProps) {
+    const turn = turns[idx];
+    const num = idx + 1;
+    function copyState() {
+        const text = encodeState(
+            turns.slice(0, idx + 1).reduce(
+                (state, turn) => executeTurn(state, turn), initialGameState));
+        navigator.clipboard.writeText(text);
+        alert('State copied to clipboard!');
+    }
+    function copyTranscript() {
+        const text = turns.slice(0, idx + 1).map(formatTurn).join(' ');
+        navigator.clipboard.writeText(text);
+        alert(`Transcript copied to clipboard!`);
+    }
+    return (
+        <React.Fragment>
+            <tr className={classNames({
+                    redoable: redoable,
+                    selected: selected,
+                    selectable: onSelect != null,
+                })}
+                onClick={onSelect == null ? undefined : () => onSelect()}
+            ><th>{num}.</th>
+                {num % 2 === 0 ? <td/> : undefined}
+                <td>{formatFancyTurn(turn)}</td>
+                {num % 2 === 1 ? <td/> : undefined}
+                <td>
+                    <span className="copy-to-clipboard" title="Copy state string"
+                        onClick={ev => { ev.stopPropagation(); copyState()}}>
+                        ♟️
+                    </span>
+                    <span className="copy-to-clipboard" title="Copy move history"
+                        onClick={ev => { ev.stopPropagation(); copyTranscript()}}>
+                        📜
+                    </span>
+                </td>
+            </tr>
+        </React.Fragment>
+    );
+}
 
 export type MoveListProps = {
     turns: readonly Turn[];
@@ -55,13 +115,7 @@ const MoveList = memo(({turns, redoableTurns, selected, onUndo, onRedo, onSelect
         }
     });
 
-    function formatFancyTurn(turn: Turn) {
-        const s = formatTurn(turn);
-        if (s.length <= 8) {
-            return s;
-        }
-        return <React.Fragment>{s.substring(0,8)}<br/>{s.substring(8)}</React.Fragment>
-    }
+    const allTurns = redoableTurns == null ? turns : turns.concat(redoableTurns);
 
     return (
         <div className="move-list">
@@ -79,7 +133,7 @@ const MoveList = memo(({turns, redoableTurns, selected, onUndo, onRedo, onSelect
                             selectable: onSelect != null,
                             selected: selected === 0,
                         })}
-                        onClick={onSelect == null ? undefined : () => onSelect(0)}
+                        key={0} onClick={onSelect == null ? undefined : () => onSelect(0)}
                     >
                         <td></td>
                         <th>Red</th>
@@ -87,42 +141,15 @@ const MoveList = memo(({turns, redoableTurns, selected, onUndo, onRedo, onSelect
                     </tr>
                 </thead>
                 <tbody>
-                    {
-                        turns.map((turn, i) => {
-                            const j = i + 1;
-                            return (
-                                <tr key={j}
-                                    className={classNames({
-                                        selectable: onSelect != null,
-                                        selected: selected === j,
-                                    })}
-                                    onClick={onSelect == null ? undefined : () => onSelect(j)}
-                                ><th>{j}.</th>
-                                    {j % 2 === 0 ? <td/> : undefined}
-                                    <td>{formatFancyTurn(turn)}</td>
-                                    {j % 2 === 1 ? <td/> : undefined}
-                                </tr>
-                            );
-                        })
-                    }
-                    {
-                        redoableTurns != null && redoableTurns.map((turn, i) => {
-                            const j = turns.length + i + 1;
-                            return (
-                                <tr key={j}
-                                    className={classNames({
-                                        redoable: true,
-                                        selectable: onSelect != null,
-                                        selected: selected === j,
-                                    })}
-                                ><th>{j}.</th>
-                                    {j % 2 === 0 ? <td/> : undefined}
-                                    <td>{formatFancyTurn(turn)}</td>
-                                    {j % 2 === 1 ? <td/> : undefined}
-                                </tr>
-                            );
-                        })
-                    }
+                    {allTurns.map((_turn, i) => {
+                        return (
+                            <Turn key={i + 1} idx={i} turns={allTurns}
+                                redoable={i >= turns.length}
+                                selected={selected === i + 1}
+                                onSelect={onSelect == null ? undefined : () => onSelect(i + 1)}
+                            />
+                        )
+                    })}
                 </tbody>
             </table>
             {(onUndo != null || onRedo != null) &&

@@ -44,14 +44,18 @@
     color: #d0d0d0;
 }
 
-.move-list tr.redoable:nth-child(odd) {
+.move-list tr.redoable:not(.selected):nth-child(odd) {
     background: #404040;
 }
 
-.move-list tr.redoable:nth-child(even) {
+.move-list tr.redoable:not(.selected):nth-child(even) {
     background: #303030;
 }
 
 .move-list tr.selected {
     background: #ffff00;
+}
+
+.copy-to-clipboard {
+    cursor: pointer;
 }
