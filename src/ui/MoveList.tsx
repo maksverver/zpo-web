@@ -1,9 +1,26 @@
-import React, { memo, useEffect } from "react";
+import React, { memo, use, useEffect } from "react";
+import { encodeState } from "../game/codec";
+import { initialGameState } from "../game/state";
 import { executeTurn, formatTurn, type Turn } from "../game/turn";
 import classNames from "../util/classNames";
 import './MoveList.css'
-import { initialGameState } from "../game/state";
-import { encodeState } from "../game/codec";
+
+const clipboardWriteEnabled: Promise<boolean> = (async () => {
+    if (!navigator.permissions) {
+        return false;
+    }
+    try {
+        const {state} = await navigator.permissions.query({name: 'clipboard-write' as PermissionName});
+        return state === "granted" || state === "prompt";
+    } catch (e) {
+        // If the browser doesn't know about this permission, assume we are
+        // allowed to write by default. (Worst case, it will fail.) At leat
+        // Firefox doesn't support this permission, but does support copying to
+        // clipboard, even from iframes.
+        console.warn(e);
+        return true;
+    }
+})();
 
 function formatFancyTurn(turn: Turn) {
     const s = formatTurn(turn);
@@ -22,6 +39,7 @@ type TurnProps = {
 }
 
 function Turn({idx, turns, redoable, selected, onSelect}: TurnProps) {
+    const copy = use(clipboardWriteEnabled);
     const turn = turns[idx];
     const num = idx + 1;
     function copyState() {
@@ -48,16 +66,18 @@ function Turn({idx, turns, redoable, selected, onSelect}: TurnProps) {
                 {num % 2 === 0 ? <td/> : undefined}
                 <td>{formatFancyTurn(turn)}</td>
                 {num % 2 === 1 ? <td/> : undefined}
-                <td>
-                    <span className="copy-to-clipboard" title="Copy state string"
-                        onClick={ev => { ev.stopPropagation(); copyState()}}>
-                        ♟️
-                    </span>
-                    <span className="copy-to-clipboard" title="Copy move history"
-                        onClick={ev => { ev.stopPropagation(); copyTranscript()}}>
-                        📜
-                    </span>
-                </td>
+                {copy &&
+                    <td>
+                        <span className="copy-to-clipboard" title="Copy state string"
+                            onClick={ev => { ev.stopPropagation(); copyState()}}>
+                            ♟️
+                        </span>
+                        <span className="copy-to-clipboard" title="Copy move history"
+                            onClick={ev => { ev.stopPropagation(); copyTranscript()}}>
+                            📜
+                        </span>
+                    </td>
+                }
             </tr>
         </React.Fragment>
     );
