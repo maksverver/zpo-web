@@ -21,6 +21,7 @@
 
 .move-list table {
     border-spacing: 0;
+    min-width: 200px;
 }
 .move-list td,
 .move-list th {
