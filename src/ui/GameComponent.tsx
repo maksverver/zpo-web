@@ -21,13 +21,18 @@ const pieceNames = Object.freeze([
     'Alfil (2.2)',
 ]);
 
+const PIECE_MIME_TYPE = 'application/x-piece';
+
 type PieceProps = {
     color: 0|1;
     piece: PieceType;
     lastMove?: SimpleMove;
+    draggable?: boolean;
+    onDragStart?: (ev: React.DragEvent<unknown>) => void;
+    onDragEnd?:   (ev: React.DragEvent<unknown>) => void;
 }
 
-function PieceComponent({color, piece, lastMove}: PieceProps) {
+function PieceComponent({color, piece, lastMove, draggable, onDragStart, onDragEnd}: PieceProps) {
     let className = `piece ${playerClassNames[color]}`;
     let style = undefined;
     if (lastMove != null) {
@@ -50,6 +55,9 @@ function PieceComponent({color, piece, lastMove}: PieceProps) {
             className={className}
             title={pieceNames[piece]}
             style={style}
+            draggable={draggable}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
         >
             {pieceEmoji[color][piece]}
         </div>
@@ -64,9 +72,10 @@ type FieldProps = {
     selected: boolean;
     selectable: boolean;
     onSelect: () => void;
+    onDeselect: () => void;
 };
 
-const Field = memo(({r, c, cp, lastMove, selected, selectable, onSelect}: FieldProps) => {
+const Field = memo(({r, c, cp, lastMove, selected, selectable, onSelect, onDeselect}: FieldProps) => {
     const i = BOARD_WIDTH*r + c;
     let className = `field ${fieldColorNames[(r + c) % 2]} ${cp == null ? 'empty' : 'occupied'}`;
     if (selected) className += ' selected';
@@ -76,10 +85,33 @@ const Field = memo(({r, c, cp, lastMove, selected, selectable, onSelect}: FieldP
         if (i === lastMove.dst) className += ' moved-to';
     }
     return (
-        <div className={className} onClick={selectable ? onSelect : undefined}>
+        <div
+            className={className}
+            onClick={selectable ? () => onSelect() : undefined}
+            onDragOver={ev => {
+                if (ev.dataTransfer.types.includes(PIECE_MIME_TYPE)) {
+                    ev.preventDefault();
+                }
+            }}
+            onDrop={ev => {
+                if (ev.dataTransfer.types.includes(PIECE_MIME_TYPE)) {
+                    onSelect?.();
+                }
+            }}
+        >
             {cp == null
                 ? <div className='label'>{rowIds[r] + colIds[c]}</div>
-                : <PieceComponent color={cp.color} piece={cp.piece} lastMove={i === lastMove?.dst ? lastMove : undefined} />}
+                : <PieceComponent
+                        color={cp.color}
+                        piece={cp.piece}
+                        lastMove={i === lastMove?.dst ? lastMove : undefined}
+                        draggable={selectable}
+                        onDragStart={selectable ? (ev) => {
+                            ev.dataTransfer.setData(PIECE_MIME_TYPE, String(i));
+                            onSelect?.();
+                        } : undefined}
+                        onDragEnd={() => onDeselect?.()}
+                    />}
         </div>
     );
 });
@@ -87,27 +119,55 @@ const Field = memo(({r, c, cp, lastMove, selected, selectable, onSelect}: FieldP
 type HandProps = {
     color: 0|1;
     pieceCounts: readonly number[];  // piece type -> number available
+    sources: Set<PieceType>;
+    destinations: Set<PieceType>;
     selected?: PieceType;
-    selectable: Set<PieceType>;
     onSelect: (p: PieceType, c: 0|1) => void;
+    onDeselect: () => void;
+    onMoveTo: () => void;
 };
 
-const Hand = memo(({color, pieceCounts, selectable: selectablePieces, selected, onSelect}: HandProps) => {
+const Hand = memo(({color, pieceCounts, sources, destinations, selected, onSelect, onDeselect, onMoveTo}: HandProps) => {
     return (
         <div className="hand">{
              pieceCounts.map((count, i) => {
                 const piece = i as PieceType;
-                const selectable = selectablePieces.has(piece);
+                const selectable = sources.has(piece) ||  destinations.has(piece);
                 let className = 'slot';
                 if (selectable) className += ' selectable';
                 if (selected === piece) className += ' selected';
                 return (count > 0 || selectable) &&
                     <div key={i}
                         className={className}
-                        onClick={selectable ? () => onSelect(piece, color) : undefined}
+                        onClick={() => {
+                            if (destinations.has(piece)) {
+                                onMoveTo();
+                            } else if (piece !== selected && sources.has(piece)) {
+                                onSelect(piece, color);
+                            } else {
+                                onDeselect();
+                            }
+                        }}
+                        draggable={sources.has(piece)}
+                        onDragStart={ev => {
+                            ev.dataTransfer.setData(PIECE_MIME_TYPE, String(-1));
+                            onSelect(piece, color);
+                        }}
+                        onDragEnd={() => onDeselect()}
+                        onDragOver={ev => {
+                            if (ev.dataTransfer.types.includes(PIECE_MIME_TYPE)) {
+                                ev.preventDefault();
+                            }
+                        }}
+                        onDrop={ev => {
+                            if (ev.dataTransfer.types.includes(PIECE_MIME_TYPE)) {
+                                onMoveTo();
+                            }
+                        }}
                     >
                         {Array.from({length: count}).map((_, i) =>
-                            <PieceComponent color={color} piece={piece} key={i}/>)}
+                            <PieceComponent key={i} color={color} piece={piece}
+                        />)}
                     </div>
             })
         }</div>
@@ -117,23 +177,40 @@ const Hand = memo(({color, pieceCounts, selectable: selectablePieces, selected, 
 type BoardProps = {
     pieces: readonly (null|ColoredPiece)[];
     lastMove?: SimpleMove;
-    selectable: Set<number>;
-    selected: number;
-    onSelect: (i: number) => void;
+    sources: Set<number>;
+    destinations: Set<number>;
+    source: number|null;
+    onSourceChanged: (source: number|null) => void;
+    onMoveTo: (destination: number) => void;
 };
 
-const Board = memo(({pieces, lastMove, selectable, selected, onSelect}: BoardProps) =>  {
+const Board = memo(({pieces, lastMove, sources, destinations, source, onSourceChanged, onMoveTo}: BoardProps) => {
     const fields = [];
     for (let r = 0; r < 8; ++r) {
         for (let c = 0; c < 8; ++c) {
             const i = 8*r + c;
             const cp = pieces[i];
+            function handleSelect() {
+                if (source != null && destinations.has(i)) {
+                    onMoveTo(i);
+                } else if (source !== i && sources.has(i)) {
+                    onSourceChanged(i);
+                } else {
+                    onSourceChanged(null);
+                }
+            }
+            function handleDeselect() {
+                if (source != null) {
+                    onSourceChanged(null);
+                }
+            }
             fields.push(
                 <Field r={r} c={c} key={i}
                     lastMove={lastMove}
-                    selected={selected === i}
-                    selectable={selectable.has(i)}
-                    onSelect={() => onSelect(i)}
+                    selected={source === i}
+                    selectable={sources.has(i) || destinations.has(i)}
+                    onSelect={handleSelect}
+                    onDeselect={handleDeselect}
                     cp={cp == null ? undefined : cp} />
             );
         }
@@ -157,64 +234,50 @@ const GameComponent = memo((props: GameProps) => {
     const {gameState, lastMove, moveGenerator, onMove} = props;
     const {hand, board} = gameState;
 
-    const selectInHand = useCallback((piece: PieceType, color: 0|1) => {
-        if (selection == null) {
-            // New selection.
-            setSelection({color, piece, src: -1});
-        } else if (selection.color === color && selection.piece === piece && selection.src !== -1) {
-            // Execute move.
-            onMove?.({...selection, dst: -1});
-        } else {
-            // Deselect.
-            setSelection(null);
-        }
-    }, [selection, onMove]);
-
-    const selectOnBoard = useCallback((src: number) => {
-        if (selection == null) {
+    const handleSourceChange = useCallback((src: number|null) => {
+        if (src != null) {
             const cp = gameState.board[src];
             if (cp != null) {
                 // New selection.
                 const {color, piece} = cp;
                 setSelection({color, piece, src});
             }
-        } else if (selection.src !== src) {
-            // Execute move. (Changing the game state will clear the selection.)
-            onMove?.({...selection, dst: src});
         } else {
             // Unselect.
             setSelection(null);
         }
-    }, [selection, gameState, onMove]);
+    }, [gameState]);
 
-    const selectable = useMemo(
+    const handleMoveTo = useCallback((dst: number) => {
+        // Execute move. (Changing the game state will clear the selection.)
+        if (selection != null) {
+            onMove?.({...selection, dst});
+        }
+    }, [selection, onMove]);
+
+    const {sourceInHand, destInHand, sourceOnBoard, destOnBoard} = useMemo(
         () => {
-            const inHand = [new Set<PieceType>(), new Set<PieceType>()];
-            const onBoard = new Set<number>;
-            if (selection == null) {
-                for (const {color, piece, src} of moveGenerator.generateSelectable(gameState)) {
-                    if (src === -1) {
-                        inHand[color].add(piece);
-                    } else {
-                        onBoard.add(src);
-                    }
-                }
-            } else {
-                for (const dst of moveGenerator.generateDestinations(gameState, selection)) {
-                    if (dst === -1) {
-                        inHand[selection.color].add(selection.piece);
-                    }  else {
-                        onBoard.add(dst);
-                    }
-                }
-                // Allow deselecting existing piece:
-                if (selection.src === -1) {
-                    inHand[selection.color].add(selection.piece);
+            const sourceInHand  = [new Set<PieceType>(), new Set<PieceType>()];
+            const destInHand    = [new Set<PieceType>(), new Set<PieceType>()];
+            const sourceOnBoard = new Set<number>;
+            const destOnBoard   = new Set<number>;
+            for (const {color, piece, src} of moveGenerator.generateSelectable(gameState)) {
+                if (src === -1) {
+                    sourceInHand[color].add(piece);
                 } else {
-                    onBoard.add(selection.src);
+                    sourceOnBoard.add(src);
                 }
             }
-            return {inHand, onBoard};
+            if (selection != null) {
+                for (const dst of moveGenerator.generateDestinations(gameState, selection)) {
+                    if (dst === -1) {
+                        destInHand[selection.color].add(selection.piece);
+                    }  else {
+                        destOnBoard.add(dst);
+                    }
+                }
+            }
+            return {sourceInHand, destInHand, sourceOnBoard, destOnBoard};
         },
         [moveGenerator, gameState, selection]);
 
@@ -242,23 +305,31 @@ const GameComponent = memo((props: GameProps) => {
             <Hand
                 color={0}
                 pieceCounts={hand[0]}
+                sources={sourceInHand[0]}
+                destinations={destInHand[0]}
                 selected={selection?.src === -1 && selection.color === 0 ? selection.piece : undefined}
-                selectable={selectable.inHand[0]}
-                onSelect={selectInHand}
+                onSelect={piece => setSelection({color: 0, piece, src: -1})}
+                onDeselect={() => setSelection(null)}
+                onMoveTo={() => handleMoveTo(-1)}
             />
             <Board
                 pieces={board}
                 lastMove={lastMove}
-                selected={selection?.src || -1}
-                selectable={selectable.onBoard}
-                onSelect={selectOnBoard}
+                sources={sourceOnBoard}
+                destinations={destOnBoard}
+                source={selection?.src ?? null}
+                onSourceChanged={handleSourceChange}
+                onMoveTo={handleMoveTo}
             />
             <Hand
                 color={1}
                 pieceCounts={hand[1]}
                 selected={selection?.src === -1 && selection.color === 1 ? selection.piece : undefined}
-                selectable={selectable.inHand[1]}
-                onSelect={selectInHand}
+                sources={sourceInHand[1]}
+                destinations={destInHand[1]}
+                onSelect={piece => setSelection({color: 1, piece, src: -1})}
+                onDeselect={() => setSelection(null)}
+                onMoveTo={() => handleMoveTo(-1)}
             />
         </div>
     );
