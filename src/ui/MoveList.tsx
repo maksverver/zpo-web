@@ -50,7 +50,7 @@ function Turn({idx, turns, redoable, selected, onSelect}: TurnProps) {
         alert('State copied to clipboard!');
     }
     function copyTranscript() {
-        const text = turns.slice(0, idx + 1).map(formatTurn).join(' ');
+        const text = turns.slice(0, idx + 1).map(t => formatTurn(t) + '\n').join('');
         navigator.clipboard.writeText(text);
         alert(`Transcript copied to clipboard!`);
     }
