@@ -48,10 +48,17 @@ function reducePlayAppState(appState: PlayAppState, action: PlayAppAction): Play
                 return { currentState: nextState, turns, states, redoStack };
             } else {
                 // Play: create a turn.
+                let newTurn = null;
+                try {
+                    newTurn = createTurnFromSimpleMove(action.move);
+                } catch (e) {
+                    console.error('Invalid move!', e);
+                    return appState;
+                }
                 nextState = endTurn(nextState);
                 return {
                     currentState: nextState,
-                    turns: [...turns, createTurnFromSimpleMove(action.move)],
+                    turns: [...turns, newTurn],
                     states: [...states, nextState],
                     redoStack: [],
                 };

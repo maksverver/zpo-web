@@ -132,7 +132,7 @@ const Hand = memo(({color, pieceCounts, sources, destinations, selected, onSelec
         <div className="hand">{
              pieceCounts.map((count, i) => {
                 const piece = i as PieceType;
-                const selectable = sources.has(piece) ||  destinations.has(piece);
+                const selectable = sources.has(piece) || destinations.has(piece);
                 let className = 'slot';
                 if (selectable) className += ' selectable';
                 if (selected === piece) className += ' selected';
@@ -155,12 +155,12 @@ const Hand = memo(({color, pieceCounts, sources, destinations, selected, onSelec
                         }}
                         onDragEnd={() => onDeselect()}
                         onDragOver={ev => {
-                            if (ev.dataTransfer.types.includes(PIECE_MIME_TYPE)) {
+                            if (ev.dataTransfer.types.includes(PIECE_MIME_TYPE) && destinations.has(piece)) {
                                 ev.preventDefault();
                             }
                         }}
                         onDrop={ev => {
-                            if (ev.dataTransfer.types.includes(PIECE_MIME_TYPE)) {
+                            if (ev.dataTransfer.types.includes(PIECE_MIME_TYPE) && destinations.has(piece)) {
                                 onMoveTo();
                             }
                         }}
