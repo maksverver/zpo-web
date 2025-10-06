@@ -4,6 +4,7 @@ import type { ColoredPiece, GameState } from '../game/state';
 import { BOARD_WIDTH, colIds, rowIds } from '../game/board';
 import type { PieceType } from '../game/piece';
 import type { MoveGenerator, Selection, SimpleMove } from '../game/move';
+import { ErrorBoundary } from './ErrorBoundary';
 
 const playerClassNames = Object.freeze(['red', 'blue']);
 const fieldColorNames = Object.freeze(['white', 'black']);
@@ -302,35 +303,41 @@ const GameComponent = memo((props: GameProps) => {
 
     return (
         <div className="game">
-            <Hand
-                color={0}
-                pieceCounts={hand[0]}
-                sources={sourceInHand[0]}
-                destinations={destInHand[0]}
-                selected={selection?.src === -1 && selection.color === 0 ? selection.piece : undefined}
-                onSelect={piece => setSelection({color: 0, piece, src: -1})}
-                onDeselect={() => setSelection(null)}
-                onMoveTo={() => handleMoveTo(-1)}
-            />
-            <Board
-                pieces={board}
-                lastMove={lastMove}
-                sources={sourceOnBoard}
-                destinations={destOnBoard}
-                source={selection?.src ?? null}
-                onSourceChanged={handleSourceChange}
-                onMoveTo={handleMoveTo}
-            />
-            <Hand
-                color={1}
-                pieceCounts={hand[1]}
-                selected={selection?.src === -1 && selection.color === 1 ? selection.piece : undefined}
-                sources={sourceInHand[1]}
-                destinations={destInHand[1]}
-                onSelect={piece => setSelection({color: 1, piece, src: -1})}
-                onDeselect={() => setSelection(null)}
-                onMoveTo={() => handleMoveTo(-1)}
-            />
+            <ErrorBoundary fallback={<p>Something went wrong rendering hand</p>}>
+                <Hand
+                    color={0}
+                    pieceCounts={hand[0]}
+                    sources={sourceInHand[0]}
+                    destinations={destInHand[0]}
+                    selected={selection?.src === -1 && selection.color === 0 ? selection.piece : undefined}
+                    onSelect={piece => setSelection({color: 0, piece, src: -1})}
+                    onDeselect={() => setSelection(null)}
+                    onMoveTo={() => handleMoveTo(-1)}
+                />
+            </ErrorBoundary>
+            <ErrorBoundary fallback={<p>Something went wrong rendering board</p>}>
+                <Board
+                    pieces={board}
+                    lastMove={lastMove}
+                    sources={sourceOnBoard}
+                    destinations={destOnBoard}
+                    source={selection?.src ?? null}
+                    onSourceChanged={handleSourceChange}
+                    onMoveTo={handleMoveTo}
+                />
+            </ErrorBoundary>
+            <ErrorBoundary fallback={<p>Something went wrong rendering hand</p>}>
+                <Hand
+                    color={1}
+                    pieceCounts={hand[1]}
+                    selected={selection?.src === -1 && selection.color === 1 ? selection.piece : undefined}
+                    sources={sourceInHand[1]}
+                    destinations={destInHand[1]}
+                    onSelect={piece => setSelection({color: 1, piece, src: -1})}
+                    onDeselect={() => setSelection(null)}
+                    onMoveTo={() => handleMoveTo(-1)}
+                />
+            </ErrorBoundary>
         </div>
     );
 });
